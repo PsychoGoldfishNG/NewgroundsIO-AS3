@@ -193,6 +193,10 @@ import NGIO;
 
 **Recommendation:** Start with **Method 1** (Connector Component) for the best experience. If you need more control over initialization, use **Method 2** instead.
 
+### Fonts
+
+NGIO components use fonts that are available in the `fonts/` directory. To match the component styling, you will need to install these fonts locally on your system.
+
 ---
 
 ## Using the Component Clips
