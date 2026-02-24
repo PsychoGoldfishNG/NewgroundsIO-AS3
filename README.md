@@ -15,23 +15,135 @@ A comprehensive ActionScript 3.0 library for integrating Newgrounds.io API funct
 
 ## Installing the Library
 
+The NewgroundsIO-AS3 library now offers **4 ways** to integrate with your Flash project, with the first 3 methods using pre-compiled code for faster game compilation.
+
 ### Option 1: Clone from Git (Recommended)
 
 If you have Git installed, clone the repository:
 
 ```bash
-git clone https://github.com/PsychoGoldfish/NewgroundsIO-AS3.git
+git clone https://github.com/PsychoGoldfishNG/NewgroundsIO-AS3.git
 ```
 
-Then follow one of the setup methods below to integrate with your project.
+Then follow one of the installation methods below.
 
 ### Option 2: Download NGIO.zip
 
-If you don't use Git, download the pre-built **NGIO.zip** file from the [v1.0.0 release](https://github.com/PsychoGoldfishNG/NewgroundsIO-AS3/releases/tag/v1.0.0). Extract it to a location on your computer.
+If you don't use Git, download the pre-built **NGIO.zip** file from the [v1.0.1 release](https://github.com/PsychoGoldfishNG/NewgroundsIO-AS3/releases/tag/v1.0.1). Extract it to a location on your computer.
 
-### Method A: Same Folder as Your FLA (Simple)
+---
 
-This method is easiest for small projects:
+## Installation Methods
+
+### Method 1: Use the Connector Component (Easiest - Pre-compiled) ✓
+
+This is the recommended approach. The Connector Component has the entire NewgroundsIO library pre-compiled inside it.
+
+1. Open `bin/components_cs5.fla` in Flash CS5 or later
+2. Go to the **connector** frame in the timeline
+3. On the stage, select the Connector Component and copy it (Ctrl+C)
+4. Open your game's FLA file
+5. Go to **frame 1** of your main timeline, paste it (Ctrl+V)
+6. In the Properties panel, set the **Component Parameters**:
+   - `App ID` - The App ID from your Newgrounds Project
+   - `Encryption Key` - The encryption key from your Newgrounds Project
+   - `App Version` - Your game's version (optional)
+
+![The Connector Component](./docs/connectorComponent.png "The Connector Component")
+
+**That's it!** The component will automatically handle app initialization and loading. Once it's done, your movie will play.
+
+**Then in your code, you can use NGIO:**
+```actionscript
+import NGIO;
+
+// NGIO is already initialized by the Connector Component
+// Check if the user is logged in
+if (NGIO.hasUser()) {
+    var user:* = NGIO.getUser();
+    trace("Welcome, " + user.name);
+} else {
+    trace("User not logged in");
+}
+```
+
+**Benefits:**
+- Dead simple: just copy from one FLA, paste into yours
+- Pre-compiled for faster game compilation
+- Automatic app initialization
+- Handles all the complexity for you
+
+---
+
+### Method 2: Drag the Library Component (Easy - Pre-compiled) ✓
+
+If you don't want to use the full Connector Component, you can just use the pre-compiled library component.
+
+1. Open `bin/components_cs5.fla` in Flash CS5 or later
+2. Go to the **library** frame in the timeline
+3. On the stage, select the NgioLibraryComponent and copy it (Ctrl+C)
+4. Open your game's FLA file
+5. Go to **frame 1** (or any early frame), paste it (Ctrl+V)
+6. That's it! You now have full access to the NGIO library
+
+![The Compiled Library Component](./docs/libraryComponent.png "The Compiled Library Component")
+
+Note: Once you have imported it, you can remove it from the timeline if you like.
+
+**Then use it in your code:**
+```actionscript
+import NGIO;
+
+// Initialize NGIO with your app credentials
+NGIO.init("YOUR_APP_ID:YOUR_SESSION_ID", "YOUR_ENCRYPTION_KEY", "1.0.0");
+
+// Now you can use NGIO!
+```
+
+**Benefits:**
+- Very easy: just copy from one FLA, paste into yours
+- Pre-compiled for faster game compilation
+- Smaller footprint than the full Connector Component
+- You have full control over initialization
+
+---
+
+### Method 3: Use the Library SWC (Advanced - Pre-compiled) ✓
+
+This method is best if you want to use the library across multiple projects without copying files.
+
+#### Step 1: Add the SWC to Your Library Path
+
+1. In Flash CS5, open: **File** → **Publish Settings**
+2. Click the **ActionScript 3.0 Settings** button
+3. Go to the **Library path** tab (not "Source path")
+4. Click the folder icon to add a new library
+5. Navigate to: `NewgroundsIO-AS3/bin/NgioClassLib.swc`
+6. Select it and make sure the **Link type** is set to **"Merged into Code"**
+7. Click **OK** and **OK** again to save
+
+#### Step 2: Use the Library in Your Code
+
+Create a new AS3 document and verify the import works:
+
+```actionscript
+import NGIO;
+
+// If this compiles without errors, your library is configured correctly
+NGIO.init("YOUR_APP_ID:YOUR_SESSION_ID", "YOUR_ENCRYPTION_KEY");
+```
+
+**Benefits:**
+- Pre-compiled for faster game compilation
+- Reusable across all your projects
+- No need to copy files to each project
+- You can version the SWC separately if desired
+
+---
+
+### Method 4: Copy Source Files (Traditional)
+
+If you prefer working with source files or need maximum flexibility, you can copy the ActionScript files directly.
 
 1. From the NewgroundsIO-AS3 repo's **build** folder, copy these folders/files into your game's folder:
    - The entire **com** folder (contains cryptography utilities)
@@ -46,7 +158,7 @@ MyGame/
 ├── NGIO.as
 ├── com/
 │   └── hurlant/
-├── io/
+└── io/
     └── newgrounds/
 ```
 
@@ -57,70 +169,53 @@ MyGame/
 import NGIO;
 ```
 
-### Method B: Library Path (Recommended for Reusable Setup)
+**Benefits:**
+- Full control over source code
+- Can modify library behavior if needed
+- Easy debugging with source files
+- No external dependencies
 
-This method allows you to use the library across multiple projects without copying files:
+**Drawbacks:**
+- Slower compilation (source files compiled each time)
+- More files to manage
+- Files duplicated if used in multiple projects
 
-#### Step 1: Choose a Library Location
+---
 
-Create a folder on your computer for ActionScript libraries. For example:
-- Windows: `C:\ActionScript3\Libraries\`
-- Mac: `~/ActionScript3\Libraries/`
+## Choosing Your Method
 
-From the NewgroundsIO-AS3 repo's **build** folder, copy these folders/files there:
-- The entire **com** folder (contains cryptography utilities)
-- The entire **io** folder (contains the core library)
-- The **NGIO.as** file (the main wrapper class)
+| Method | Ease | Speed |
+|--------|------|-------|
+| 1. Connector Component | ⭐⭐⭐ | ⭐⭐⭐ |
+| 2. Library Component | ⭐⭐ | ⭐⭐⭐ |
+| 3. Library SWC | ⭐ | ⭐⭐⭐ |
+| 4. Source Files | ⭐⭐ | ⭐ |
 
-Your folder structure should look like:
-```
-C:\ActionScript3\Libraries\
-├── NGIO.as
-├── com/
-│   └── hurlant/
-└── io/
-    └── newgrounds/
-```
+**Recommendation:** Start with **Method 1** (Connector Component) for the best experience. If you need more control over initialization, use **Method 2** instead.
 
-#### Step 2: Configure Flash CS5 Library Paths
-
-1. In Flash CS5, open: **File** → **Publish Settings**
-2. Click the **ActionScript 3.0 Settings** button (or go to **Edit** → **Preferences** → **ActionScript** → **ActionScript 3.0 Settings** in some versions)
-3. Go to the **Source path** tab
-4. Click the folder icon to add a new path
-5. Browse to your library folder (e.g., `C:\ActionScript3\Libraries\`)
-6. Click **OK** and **OK** again to save
-
-#### Step 3: Verify Configuration
-
-Create a new AS3 document and verify the import works:
-
-```actionscript
-import NGIO;
-import io.newgrounds.SessionStatus;
-
-// If this compiles without errors, your library path is configured correctly
-trace("NewgroundsIO-AS3 library loaded successfully");
-```
 ---
 
 ## Using the Component Clips
 
-The library includes a **components_cs5.fla** file with pre-built Flash components for common Newgrounds.io features:
+The library includes **bin/components_cs5.fla** with pre-built Flash components for common Newgrounds.io features. These components have the NewgroundsIO library pre-compiled inside them:
 
-- **Connector Component** - Initializes your app, loads all metadata, and handles logging in users
+- **Connector Component** - Initializes your app, loads all metadata, and handles logging in users (includes full library)
 - **Medal Popup Component** - Display unlocked medals to the user
 - **ScoreBoard Components** - Show high scores
 - **Cloud Save Components** - Interface for saving and loading cloud saves
+- **NgioLibraryComponent** - Standalone library component (includes full library without other features)
 
-### Copying Components to Your FLA
+### Accessing Components from Your FLA
 
-1. Open **components_cs5.fla** in Flash CS5 or later
-2. On the timeline, find the component you want (Connector, Medal Popup, etc.)
-3. Right-click the component symbol → **Copy**
-4. Open your game's FLA file
-5. Click on your stage where you want the component, then right-click → **Paste** (or use Ctrl+V)
-6. Configure the component using the **Component Parameters** in the Properties panel
+The easiest way is to use **Method 1** or **Method 2** from the Installation section above, which lets you open the external library and drag components directly into your FLA.
+
+Alternatively, you can:
+
+1. Open **bin/components_cs5.fla** in Flash CS5 or later
+2. In the Library panel, find the component you want
+3. Right-click the component symbol → **Copy** (or drag it directly to another FLA)
+4. In your game's FLA, right-click on your stage where you want the component → **Paste** (or use Ctrl+V)
+5. Configure the component using the **Component Parameters** in the Properties panel
 
 ![The Component Parameters Section](./docs/componentParameters.png "The Component Parameters Section")
 
