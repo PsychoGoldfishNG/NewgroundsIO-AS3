@@ -25,4 +25,6 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: NGIO.zip
+          files: |
+            bin/components_cs5.fla
+            bin/NgioClassLib.swc
