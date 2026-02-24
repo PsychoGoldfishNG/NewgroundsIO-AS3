@@ -27,7 +27,7 @@ Then follow one of the setup methods below to integrate with your project.
 
 ### Option 2: Download NGIO.zip
 
-If you don't use Git, download the pre-built **NGIO.zip** file from the [releases page](https://github.com/PsychoGoldfish/NewgroundsIO-AS3/releases). Extract it to a location on your computer.
+If you don't use Git, download the pre-built **NGIO.zip** file from the [v1.0.0 release](https://github.com/PsychoGoldfishNG/NewgroundsIO-AS3/releases/tag/v1.0.0). Extract it to a location on your computer.
 
 ### Method A: Same Folder as Your FLA (Simple)
 
@@ -54,7 +54,7 @@ MyGame/
 
 3. You can now import and use NGIO:
 ```actionscript
-import io.newgrounds.NGIO;
+import NGIO;
 ```
 
 ### Method B: Library Path (Recommended for Reusable Setup)
@@ -96,7 +96,7 @@ C:\ActionScript3\Libraries\
 Create a new AS3 document and verify the import works:
 
 ```actionscript
-import io.newgrounds.NGIO;
+import NGIO;
 import io.newgrounds.SessionStatus;
 
 // If this compiles without errors, your library path is configured correctly
