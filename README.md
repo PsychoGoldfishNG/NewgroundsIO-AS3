@@ -27,9 +27,9 @@ git clone https://github.com/PsychoGoldfishNG/NewgroundsIO-AS3.git
 
 Then follow one of the installation methods below.
 
-### Option 2: Download NGIO.zip
+### Option 2: Direct Download
 
-If you don't use Git, download the pre-built **NGIO.zip** file from the [v1.0.1 release](https://github.com/PsychoGoldfishNG/NewgroundsIO-AS3/releases/tag/v1.0.1). Extract it to a location on your computer.
+If you don't use Git, download the library from the [v1.0.1 release](https://github.com/PsychoGoldfishNG/NewgroundsIO-AS3/releases/tag/v1.0.1). Extract it to a location on your computer.
 
 ---
 
