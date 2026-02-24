@@ -1,0 +1,144 @@
+<%
+/**
+ * ====================================================================================
+ * TEMPLATE: Component Model
+ * ====================================================================================
+ * 
+ * PURPOSE: Generates class files for Newgrounds.io component methods.
+ * 
+ * WHAT ARE COMPONENTS?: Components are API methods you can call, organized by category:
+ * - App.checkSession: Validates the current user session
+ * - Medal.unlock: Unlocks an achievement for the user
+ * - ScoreBoard.postScore: Posts a score to a leaderboard
+ * - CloudSave.loadSlot: Loads saved game data from the cloud
+ * 
+ * AVAILABLE VARIABLES:
+ * - model: Object containing all properties and metadata for this component method
+ * - model.component: The component namespace (e.g., "Medal", "App", "ScoreBoard")
+ * - model.method: The method name (e.g., "unlock", "checkSession", "postScore")
+ * - model.description: Human-readable description of what this method does
+ * - model.properties: Object containing all parameters this method accepts
+ * - model.secure: Boolean - if true, this must be encrypted to prevent cheating
+ * - model.require_session: Boolean - if true, requires a logged-in user
+ * - model.redirect: Boolean - if true, opens in new tab and redirects
+ * - helpers: Your custom helper methods (from helpers.js)
+ * - partial: Methods to include partial templates (partial.get, partial.getIfExists)
+ * - config: Your full config object with all settings
+ * 
+ * EJS DOCUMENTATION: https://ejs.co/
+ * 
+ * ====================================================================================
+ */
+
+// COMMENT: Prepare data structures we'll need while generating this class
+// NOTE: Filter out 'error' property because it's now inherited from BaseObject
+// All BaseObject subclasses (objects, components, results) have error defined at the base level
+const propertyNames = model.properties ? Object.keys(model.properties).filter(prop => prop !== 'error') : [];
+const requiredParams = [];
+const hasProperties = propertyNames.length > 0;
+-%>
+
+/**
+ * <%- model.method %>
+ * 
+ * Component: <%- model.component %>.<%- model.method %>
+ * <%- model.description %>
+ */
+package io.newgrounds.models.components.<%- model.component %> {
+	
+	import io.newgrounds.BaseComponent;
+<%- partial.getIfExists(`components/${model.component}/${model.method}/imports`) -%>
+	
+	public class <%- model.method %> extends BaseComponent {
+		
+		//==================== PROPERTIES ====================
+		
+<% if (hasProperties) { -%>
+<%   for (let propertyName of propertyNames) { -%>
+<%#    redirect is a property of BaseComponent, we can skip defining it here -%>
+<%     if (propertyName === 'redirect') continue -%>
+<%     if (model.properties[propertyName].required) requiredParams.push(propertyName); -%>
+		/**
+		 * <%- model.properties[propertyName].description %>
+		 */
+		public var <%- propertyName %>:<%- helpers.getDataType(model.properties[propertyName]) %> = <%- helpers.getDefaultValue(model.properties[propertyName]) %>;
+		
+<%   } -%>
+<% } -%>
+<%- partial.getIfExists(`components/${model.component}/${model.method}/properties`) -%>
+		
+		//==================== CONSTRUCTOR ====================
+		
+		public function <%- model.method %>() {
+			super();
+			
+			// Set component-specific flags
+			this.isSecure = <%= model.secure ? "true" : "false" %>;
+			this.requiresSession = <%= model.require_session ? "true" : "false" %>;
+			this.redirect = <%= model.redirect ? "true" : "false" %>;
+<%- partial.getIfExists(`components/${model.component}/${model.method}/constructor`) -%>
+		}
+		
+		//==================== ABSTRACT PROPERTY OVERRIDES ====================
+		
+		/**
+		 * Object name for debugging and type checking
+		 */
+		override public function get objectName():String {
+			return "<%- model.component %>.<%- model.method %>";
+		}
+		
+		/**
+		 * Object type identifier
+		 */
+		override public function get objectType():String {
+			return "component";
+		}
+		
+		/**
+		 * All property names for this component
+		 */
+		override public function get propertyNames():Array {
+			return <%- JSON.stringify(propertyNames) %>;
+		}
+		
+		/**
+		 * Required properties for validation
+		 */
+		override public function get requiredProperties():Array {
+			return <%- JSON.stringify(requiredParams) %>;
+		}
+		
+		/**
+		 * Type casting map for deserializing properties
+		 */
+		override public function get castTypes():Object {
+			return {
+<% if (hasProperties) { -%>
+<%   let isFirst = true; -%>
+<%   for (let propertyName of propertyNames) { -%>
+<%     const prop = model.properties[propertyName]; -%>
+<%     let castValue = "null"; -%>
+<%     if (prop.object && prop.array) { -%>
+<%       castValue = `"array-of-${prop.object}"`; -%>
+<%     } else if (prop.object) { -%>
+<%       castValue = `"${prop.object}"`; -%>
+<%     } else if (prop.array) { -%>
+<%       castValue = "\"Array\""; -%>
+<%     } -%>
+<%     if (castValue !== "null") { -%>
+<%       if (!isFirst) { %>,
+<%       } -%>
+				"<%- propertyName %>": <%- castValue %><%       isFirst = false; -%>
+<%     } -%>
+<%   } -%>
+<%   if (!isFirst) { %>
+<%   } -%>
+<% } -%>
+			};
+		}
+		
+		//==================== CUSTOM METHODS ====================
+<%- partial.getIfExists(`components/${model.component}/${model.method}/methods`) -%>
+	}
+}

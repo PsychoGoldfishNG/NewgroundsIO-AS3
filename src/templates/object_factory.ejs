@@ -1,0 +1,174 @@
+<%
+/**
+ * ====================================================================================
+ * TEMPLATE: Object Factory / Index
+ * ====================================================================================
+ * 
+ * PURPOSE: Generates a factory class that creates object instances by name.
+ * 
+ * WHAT IS THIS?: A factory pattern implementation that allows you to create objects,
+ * components, and results dynamically based on string names rather than hardcoding
+ * class instantiation everywhere.
+ * 
+ * WHY IS THIS USEFUL?: When parsing JSON from the API, you often receive an object
+ * type as a string (e.g., "Medal", "User"). This factory lets you convert those
+ * strings into actual class instances without a massive if/else chain.
+ * 
+ * EXAMPLE USAGE:
+ *   var medal = ObjectFactory.CreateObject("Medal", jsonData);
+ *   var unlockComponent = ObjectFactory.CreateComponent("Medal", "unlock", params);
+ *   var unlockResult = ObjectFactory.CreateResult("Medal", "unlock", responseData);
+ * 
+ * AVAILABLE VARIABLES:
+ * - models: Object containing all generated models
+ * - models.objects: All core object models (Medal, User, Score, etc.)
+ * - models.components: All component models (organized by component.method)
+ * - models.results: All result models (organized by component.method)
+ * - helpers: Your custom helper methods (from helpers.js)
+ * - partial: Methods to include partial templates
+ * - config: Your full config object with all settings
+ * 
+ * EJS DOCUMENTATION: https://ejs.co/
+ * 
+ * ====================================================================================
+ */
+-%>
+package io.newgrounds.models.objects {
+    
+    import io.newgrounds.BaseObject;
+    import io.newgrounds.BaseComponent;
+    import io.newgrounds.BaseResult;
+    import io.newgrounds.Core;
+    
+    // Import all object models
+<%  for(const model in models.objects) { -%>
+<%    const className = helpers.getClassName(models.objects[model].name); -%>
+    import io.newgrounds.models.objects.<%- className %>;
+<%  } -%>
+    
+    // Import all component models
+<%  for(const component in models.components) { -%>
+<%   for(const method in models.components[component]) { -%>
+    import io.newgrounds.models.components.<%- component %>.<%- method %>;
+<%   } -%>
+<%  } -%>
+    
+    // Import all result models
+<%  for(const result in models.results) { -%>
+<%   for(const method in models.results[result]) { -%>
+    import io.newgrounds.models.results.<%- result %>.<%- method %>Result;
+<%   } -%>
+<%  } -%>
+    
+    /**
+     * Factory class for creating Newgrounds.io object instances by name.
+     * This allows dynamic instantiation based on string identifiers from the API.
+     * Uses direct imports and instantiation (no reflection).
+     */
+    public class ObjectFactory {
+        
+        /**
+         * Creates an instance of a core object model (Medal, User, Score, etc.)
+         * @param name The object type name (case-insensitive)
+         * @param objectData Properties to initialize the object with
+         * @param coreReference Core instance to assign to the component (optional)
+         * @return An instance of the requested object, or null if not found
+         */
+        public static function CreateObject(name:String, objectData:Object = null, coreReference:Core=null):BaseObject {
+            if (!name) return null;
+            
+            var obj:BaseObject = null;
+            
+            switch(name.toLowerCase()) {
+<%          for(const model in models.objects) { -%>
+<%            const className = helpers.getClassName(models.objects[model].name); -%>
+                case "<%- model.toLowerCase() %>":
+                    obj = new io.newgrounds.models.objects.<%- className %>();
+                    break;
+                
+<%          } -%>
+            }
+
+            if (coreReference) obj.core = coreReference;
+            
+            // If object was created and data provided, import the data
+            if (obj != null && objectData != null) {
+                obj.importFromObject(objectData);
+            }
+            
+            return obj;
+        }
+        
+        /**
+         * Creates an instance of a component model (Medal.unlock, App.checkSession, etc.)
+         * @param component The component namespace (e.g., "Medal", "App", "ScoreBoard")
+         * @param method The method name (e.g., "unlock", "checkSession", "postScore")
+         * @param props Properties/parameters to initialize the component with
+         * @param coreReference Core instance to assign to the component (optional)
+         * @return An instance of the requested component, or null if not found
+         */
+        public static function CreateComponent(component:String, method:String, props:Object = null, coreReference:Core = null):BaseComponent {
+            if (!component || !method) return null;
+            
+            var comp:BaseComponent = null;
+            var fullName:String = component + "." + method;
+            
+            switch(fullName.toLowerCase()) {
+<%       for(const component in models.components) { -%>
+<%        for(const method in models.components[component]) { -%>
+<%          const name = `${component}.${method}`; -%>
+                case "<%- name.toLowerCase() %>":
+                    comp = new io.newgrounds.models.components.<%- component %>.<%- method %>();
+                    break;
+                
+<%        } -%>
+<%       } -%>
+            }
+            
+            if (coreReference) comp.core = coreReference;
+            
+            // If component was created and data provided, import the data
+            if (comp != null && props != null) {
+                comp.importFromObject(props);
+            }
+            
+            return comp;
+        }
+        
+        /**
+         * Creates an instance of a result model with data returned from the API
+         * @param component The component namespace that was called (e.g., "Medal", "App")
+         * @param method The method name that was called (e.g., "unlock", "checkSession")
+         * @param props The result data returned from the server
+         * @param coreReference Core instance to assign to the result (optional)
+         * @return An instance of the requested result object, or null if not found
+         */
+        public static function CreateResult(component:String, method:String, props:Object = null, coreReference:Core = null):BaseResult {
+            if (!component || !method) return null;
+            
+            var result:BaseResult = null;
+            var fullName:String = component + "." + method;
+            
+            switch(fullName.toLowerCase()) {
+<%       for(const result in models.results) { -%>
+<%        for(const method in models.results[result]) { -%>
+<%          const name = `${result}.${method}`; -%>
+                case "<%- name.toLowerCase() %>":
+                    result = new io.newgrounds.models.results.<%- result %>.<%- method %>Result();
+                    break;
+                
+<%        } -%>
+<%       } -%>
+            }
+            
+            if (coreReference) result.core = coreReference;
+            
+            // If result was created and data provided, import the data
+            if (result != null && props != null) {
+                result.importFromObject(props);
+            }
+            
+            return result;
+        }
+    }
+}

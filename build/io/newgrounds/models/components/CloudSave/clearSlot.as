@@ -1,0 +1,73 @@
+
+/**
+ * clearSlot
+ * 
+ * Component: CloudSave.clearSlot
+ * Deletes all data from a save slot.
+ */
+package io.newgrounds.models.components.CloudSave {
+	
+	import io.newgrounds.BaseComponent;
+	
+	public class clearSlot extends BaseComponent {
+		
+		//==================== PROPERTIES ====================
+		
+		/**
+		 * The slot number.
+		 */
+		public var id:Number = NaN;
+		
+		
+		//==================== CONSTRUCTOR ====================
+		
+		public function clearSlot() {
+			super();
+			
+			// Set component-specific flags
+			this.isSecure = false;
+			this.requiresSession = true;
+			this.redirect = false;
+		}
+		
+		//==================== ABSTRACT PROPERTY OVERRIDES ====================
+		
+		/**
+		 * Object name for debugging and type checking
+		 */
+		override public function get objectName():String {
+			return "CloudSave.clearSlot";
+		}
+		
+		/**
+		 * Object type identifier
+		 */
+		override public function get objectType():String {
+			return "component";
+		}
+		
+		/**
+		 * All property names for this component
+		 */
+		override public function get propertyNames():Array {
+			return ["id"];
+		}
+		
+		/**
+		 * Required properties for validation
+		 */
+		override public function get requiredProperties():Array {
+			return ["id"];
+		}
+		
+		/**
+		 * Type casting map for deserializing properties
+		 */
+		override public function get castTypes():Object {
+			return {
+			};
+		}
+		
+		//==================== CUSTOM METHODS ====================
+	}
+}

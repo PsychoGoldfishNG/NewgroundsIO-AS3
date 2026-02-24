@@ -1,0 +1,19 @@
+		/**
+		 * Sets the component to be executed
+		 * 
+		 * @param componentModel A component model instance with all required properties set
+		 */
+		public function setComponent(componentModel:BaseComponent):void {
+			// Store reference to the component
+			this.componentModel = componentModel;
+			this.component = componentModel.objectName;
+			if (componentModel.hasOwnProperty("prepareForJson")) {
+				this.parameters = componentModel.prepareForJson();
+			} else if (componentModel.hasOwnProperty("toObject")) {
+				this.parameters = componentModel.toObject();
+			} else {
+				this.parameters = null;
+			}
+			// Note: Encryption for secure components is handled by HttpRequestHelper
+			// This Execute object just stores the component name and parameters
+		}

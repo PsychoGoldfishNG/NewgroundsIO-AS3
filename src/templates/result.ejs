@@ -1,0 +1,157 @@
+<%
+/**
+ * ====================================================================================
+ * TEMPLATE: Component Result Model
+ * ====================================================================================
+ * 
+ * PURPOSE: Generates class files for component result objects.
+ * 
+ * WHAT ARE RESULTS?: When you call a component (API method), the server responds with
+ * a result object containing the data returned. For example:
+ * - Medal.unlock returns: { medal_score: number, unlocked_medals: array<Medal> }
+ * - ScoreBoard.getScores returns: { scores: array<Score>, user: User }
+ * - App.checkSession returns: { session: Session }
+ * 
+ * WHY SEPARATE FROM COMPONENTS?: Components are what you SEND to the server (input),
+ * Results are what you GET BACK from the server (output). They're modeled separately.
+ * 
+ * AVAILABLE VARIABLES:
+ * - model: Object containing all properties and metadata for this result
+ * - model.component: The component namespace (e.g., "Medal", "App", "ScoreBoard")
+ * - model.method: The method name (e.g., "unlock", "checkSession", "getScores")
+ * - model.properties: Object containing all properties this result returns
+ * - helpers: Your custom helper methods (from helpers.js)
+ * - partial: Methods to include partial templates (partial.get, partial.getIfExists)
+ * - config: Your full config object with all settings
+ * 
+ * EJS DOCUMENTATION: https://ejs.co/
+ * 
+ * ====================================================================================
+ */
+
+// COMMENT: Prepare data structures we'll need while generating this class
+// NOTE: Filter out 'error' property because it's now inherited from BaseObject
+// All BaseObject subclasses (objects, components, results) have error defined at the base level
+const propertyNames = Object.keys(model.properties).filter(prop => prop !== 'error');
+const requiredParams = [];
+const hasProperties = propertyNames.length > 0;
+-%>
+
+/**
+ * <%- model.method %>Result
+ * 
+ * Result for: <%- model.component %>.<%- model.method %>
+ * Contains the data returned by the <%- model.component %>.<%- model.method %> API call
+ */
+package io.newgrounds.models.results.<%- model.component %> {
+	
+	import io.newgrounds.BaseResult;
+<%
+// Auto-import any object types used in properties
+const importedTypes = new Set();
+for (let propertyName in model.properties) {
+	const prop = model.properties[propertyName];
+	if (prop.object && prop.object !== "Result") {
+		importedTypes.add(prop.object);
+	}
+}
+for (let typeName of importedTypes) {
+-%>
+	import io.newgrounds.models.objects.<%- typeName %>;
+<%
+}
+-%>
+<%- partial.getIfExists(`results/${model.component}/${model.method}/imports`) -%>
+	
+	public class <%- model.method %>Result extends BaseResult {
+		
+		//==================== PROPERTIES ====================
+		
+<% if (hasProperties) { -%>
+<%   for (let propertyName of propertyNames) { -%>
+<%     if (model.properties[propertyName].required) requiredParams.push(propertyName); -%>
+<%     const prop = model.properties[propertyName]; -%>
+<%     let typeName = helpers.getDataType(prop); -%>
+<%     // For object types, use just the class name since we imported it -%>
+<%     if (prop.object && prop.object !== "Result") typeName = prop.object; -%>
+		/**
+		 * <%- prop.description %>
+		 */
+public var <%- propertyName %>:<%- typeName %> = <%- helpers.getDefaultValue(prop) %>;
+		
+<%   } -%>
+<% } -%>
+<%- partial.getIfExists(`results/${model.component}/${model.method}/properties`) -%>
+		
+		//==================== CONSTRUCTOR ====================
+		
+		public function <%- model.method %>Result() {
+			super();
+<%- partial.getIfExists(`results/${model.component}/${model.method}/constructor`) -%>
+		}
+		
+		//==================== ABSTRACT PROPERTY OVERRIDES ====================
+		
+		/**
+		 * Object name for debugging and type checking
+		 */
+		override public function get objectName():String {
+			return "<%- model.component %>.<%- model.method %>";
+		}
+		
+		/**
+		 * Object type identifier
+		 */
+		override public function get objectType():String {
+			return "result";
+		}
+		
+		/**
+		 * All property names for this result
+		 */
+		override public function get propertyNames():Array {
+			return <%- JSON.stringify(propertyNames) %>;
+		}
+		
+		/**
+		 * Required properties for validation
+		 */
+		override public function get requiredProperties():Array {
+			return <%- JSON.stringify(requiredParams) %>;
+		}
+		
+		/**
+		 * Type casting map for deserializing properties
+		 */
+		override public function get castTypes():Object {
+			return {
+<% if (hasProperties) { -%>
+<%   let isFirst = true; -%>
+<%   for (let propertyName of propertyNames) { -%>
+<%     const prop = model.properties[propertyName]; -%>
+<%     let castValue = "null"; -%>
+<%     if (prop.array && prop.array.object) { -%>
+<%       castValue = `"array-of-${prop.array.object}"`; -%>
+<%     } else if (prop.object && prop.array) { -%>
+<%       castValue = `"array-of-${prop.object}"`; -%>
+<%     } else if (prop.object) { -%>
+<%       castValue = `"${prop.object}"`; -%>
+<%     } else if (prop.array) { -%>
+<%       castValue = "\"Array\""; -%>
+<%     } -%>
+<%     if (castValue !== "null") { -%>
+<%       if (!isFirst) { %>,
+<%       } -%>
+				"<%- propertyName %>": <%- castValue %><%       isFirst = false; -%>
+<%     } -%>
+<%   } -%>
+<%   if (!isFirst) { %>
+<%   } -%>
+<% } -%>
+			};
+		}
+		
+		//==================== CUSTOM METHODS ====================
+<%- partial.getIfExists(`results/${model.component}/${model.method}/methods`) -%>
+	}
+}
