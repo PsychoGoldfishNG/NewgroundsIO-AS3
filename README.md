@@ -29,7 +29,13 @@ Then follow one of the installation methods below.
 
 ### Option 2: Direct Download
 
-If you don't use Git, download the library from the [v1.0.1 release](https://github.com/PsychoGoldfishNG/NewgroundsIO-AS3/releases/tag/v1.0.1). Extract it to a location on your computer.
+If you don't use Git, download the library from the [v1.0.1 release](https://github.com/PsychoGoldfishNG/NewgroundsIO-AS3/releases/tag/v1.0.1). The release includes:
+
+- **components_cs5.fla** - Pre-compiled components (for Methods 1 & 2)
+- **NgioClassLib.swc** - Pre-compiled library (for Method 3)
+- **Source files** - ActionScript source code (for Method 4)
+
+Extract the files to a location on your computer, then follow one of the installation methods below.
 
 ---
 
