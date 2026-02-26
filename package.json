@@ -1,6 +1,6 @@
 {
   "name": "@psychogoldfish/newgroundsio-as3-library",
-  "version": "0.1.0",
+  "version": "1.0.2",
   "description": "AS3 library for Newgrounds.io API",
   "scripts": {
     "build": "npx ngio-build ./src/modelgen/config.js"
