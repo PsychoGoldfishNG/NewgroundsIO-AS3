@@ -260,11 +260,11 @@ Once the component has completed its tasks, it will automatically play the movie
 
 Use an event listener for custom handling when the component has completed its tasks:
 
-Give the component an instance name of `ngioConnector`.
+The component automatically associates itself in the `NGIO` class:
 ```actionscript
 import io.newgrounds.NgioEvent;
 
-ngioConnector.addEventListener(NgioEvent.CONNECTOR_COMPLETED, function(e:NgioEvent) {
+NGIO.connectorComponent.addEventListener(NgioEvent.CONNECTOR_COMPLETED, function(e:NgioEvent) {
 	// start your game!
 });
 ```
@@ -317,12 +317,12 @@ All 3 versions use the same setup. Simply paste them wherever you want to show t
 
 Each scoreboard has a close (X) button in the top right.  You can edit the clip and remove it if you want to handle exiting the scoreboard screen yourself.
 
-Otherwise, you can give the board you are using an instance name of `ngioScoreBoard` and listen for when the close button is clicked like so:
+Otherwise, you can listen for when the close button is clicked using the static reference:
 
 ```actionscript
 import io.newgrounds.NgioEvent;
 
-ngioScoreBoard.addEventListener(NgioEvent.COMPONENT_CLOSED, function(e:NgioEvent) {
+NGIO.scoreboardComponent.addEventListener(NgioEvent.COMPONENT_CLOSED, function(e:NgioEvent) {
 	// handle closing the board
 });
 ```
@@ -365,14 +365,15 @@ Copy the component wherever you have a save or load dialogue and set the followi
 
 #### Basic Use ####
 
-Give the component an instance name of `saveSlotManager`.
+The component automatically associates itself in the `NGIO` class, so you can reference it from anywhere in your game.
 
 For loading data, use the following code:
 
 ```actionscript
 import io.newgrounds.NgioEvent;
 
-saveSlotManager.addEventListener(NgioEvent.SAVESLOT_LOADED, function(e:NgioEvent) {
+// listens for when the slot has been selected and teh data has been pulled from the server
+NGIO.saveManagerComponent.addEventListener(NgioEvent.SAVESLOT_LOADED, function(e:NgioEvent) {
     if (e.error == null) {
         // you have your data now!
     	var loaded_data:* = e.data;
@@ -384,7 +385,11 @@ For saving data, use the following code:
 ```actionscript
 import io.newgrounds.NgioEvent;
 
-saveSlotManager.addEventListener(NgioEvent.SAVESLOT_SAVED, function(e:NgioEvent) {
+// first, attach the data you want to save
+NGIO.saveManagerComponent.setData(data_to_save);
+
+// listen for when the slot has been selected and saved on the server
+NGIO.saveManagerComponent.addEventListener(NgioEvent.SAVESLOT_SAVED, function(e:NgioEvent) {
 	if (e.error == null) {
         // your data saved successfully!
     }
@@ -396,7 +401,7 @@ Each saveslot manager has a close (X) button in the top right.  You can edit the
 ```actionscript
 import io.newgrounds.NgioEvent;
 
-saveSlotManager.addEventListener(NgioEvent.COMPONENT_CLOSED, function(e:NgioEvent) {
+NGIO.saveManagerComponent.addEventListener(NgioEvent.COMPONENT_CLOSED, function(e:NgioEvent) {
 	// handle closing the save manager
 });
 ```

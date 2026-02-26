@@ -37,6 +37,13 @@ package {
 		
 		//==================== PUBLIC STATIC PROPERTIES ====================
         
+
+		/**
+		 * If using our Connector Component, it will create a global reference
+		 * to itself using this variable.
+		 */
+        public static var connectorComponent:MovieClip = null;
+
         /**
          * If using our Medal Popup component, it will create a global reference
          * to itself using this variable.
@@ -47,7 +54,13 @@ package {
 		 * If using our ScoreBoard component, it will create a global reference
 		 * to itself using this variable.
 		 */
-		public static var scoreBoardComponent:MovieClip = null;
+		public static var scoreboardComponent:MovieClip = null;
+
+		/**
+		 * If using our SaveManager component, it will create a global reference
+		 * to itself using this variable.
+		 */
+		public static var saveManagerComponent:MovieClip = null;
 
         /**
          * Adjust the volume value if you want NGIO components to be quieter
