@@ -47,17 +47,17 @@ package io.newgrounds.helpers {
 				throw new Error("Could not create Gateway.ping component");
 			}
 			
-			core.executeComponent(component as io.newgrounds.BaseComponent, function(result:*):void {
+			core.executeComponent(component as io.newgrounds.BaseComponent, function(response:io.newgrounds.models.objects.Response):void {
 				if (callback == null) {
 					return;
 				}
 				
-				if (result == null) {
+				if (response == null) {
 					callback.call(thisArg, null, null);
 					return;
 				}
 				
-				var error:* = (result.error !== null) ? result.error : null;
+				var error:* = (response.error !== null) ? response.error : null;
 				callback.call(thisArg, 'pong', error);
 			});
 		}
@@ -72,17 +72,25 @@ package io.newgrounds.helpers {
 				throw new Error("Could not create Gateway.getDateTime component");
 			}
 			
-			core.executeComponent(component as io.newgrounds.BaseComponent, function(result:*):void {
-				if (result == null) {
+			core.executeComponent(component as io.newgrounds.BaseComponent, function(response:io.newgrounds.models.objects.Response):void {
+				if (response == null) {
 					if (callback !== null) {
 						callback.call(thisArg, null, null);
 					}
 					return;
 				}
 				
-				var error:* = (result.error !== null) ? result.error : null;
+				var error:* = (response.error !== null) ? response.error : null;
+				var result:* = (response !== null && response.success === true) ? response.getResult() : null;
+				var resultValue = null;
+
+				if (error === null && result !== null && result.error !== null) {
+					error = result.error;
+				}
 				if (callback !== null) {
-					if (returnType == RETURN_DATETIME) {
+					if (error !== null || result === null) {
+						callback.call(thisArg, null, error);
+					} else if (returnType == RETURN_DATETIME) {
 						callback.call(thisArg, result.datetime, error);
 					} else if (returnType == RETURN_DATE) {
 						callback.call(thisArg, new Date(result.timestamp * 1000), error);

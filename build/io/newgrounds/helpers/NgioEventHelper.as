@@ -26,14 +26,21 @@ package io.newgrounds.helpers {
 			component.host = (core.appState.host !== null) ? core.appState.host : "N/A";
 			component.event_name = eventName;
 			
-			core.executeComponent(component as io.newgrounds.BaseComponent, function(result:*):void {
+			core.executeComponent(component as io.newgrounds.BaseComponent, function(response:io.newgrounds.models.objects.Response):void {
 				if (callback == null) {
 					return;
 				}
 				
 				var error:* = null;
-				if (result !== null && result.error !== null) {
-					error = result.error;
+				if (response !== null) {
+					if (response.error !== null) {
+						error = response.error;
+					} else {
+						var result:* = response.getResult();
+						if (result !== null && result.error !== null) {
+							error = result.error;
+						}
+					}
 				}
 				callback.call(thisArg, error);
 			});

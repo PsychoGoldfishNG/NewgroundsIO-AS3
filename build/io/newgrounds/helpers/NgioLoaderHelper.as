@@ -29,15 +29,19 @@ package io.newgrounds.helpers {
 			component.log_stat = logStat;
 			component.redirect = false;
 			
-			core.executeComponent(component as io.newgrounds.BaseComponent, function(result:*):void {
+			core.executeComponent(component as io.newgrounds.BaseComponent, function(response:io.newgrounds.models.objects.Response):void {
+
 				if (callback !== null) {
 					var url:String = null;
 					var error:* = null;
-					
-					if (result !== null) {
-						url = result.url;
-						if (result.error !== null) {
-							error = result.error;
+
+					if (response !== null) {
+						var result:* = response.getResult();
+						if (result !== null) {
+							url = result.url;
+							if (result.error !== null) {
+								error = result.error;
+							}
 						}
 					}
 					

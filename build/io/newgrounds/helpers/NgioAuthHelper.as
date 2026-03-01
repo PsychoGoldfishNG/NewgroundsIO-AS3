@@ -106,7 +106,17 @@ package io.newgrounds.helpers {
 				if (startSessionComponent == null) {
 					throw new Error("Could not create App.startSession component");
 				}
-				core.executeComponent(startSessionComponent as io.newgrounds.BaseComponent, function(result:*):void {
+				core.executeComponent(startSessionComponent as io.newgrounds.BaseComponent, function(response:io.newgrounds.models.objects.Response):void {
+					
+					if (!response || response.success !== true) {
+						sessionStatus.status = SessionStatus.ERROR;
+						sessionStatus.error = (response && response.error) ? response.error : Errors.getError();
+						callCallback(sessionStatus);
+						return;
+					}
+
+					var result:io.newgrounds.models.results.App.checkSessionResult = response.getResult() as io.newgrounds.models.results.App.checkSessionResult;
+					
 					if (result !== null && result.success === true) {
 						sessionStatus.status = SessionStatus.NOT_LOGGED_IN;
 					} else if (result !== null && result.error !== null) {
