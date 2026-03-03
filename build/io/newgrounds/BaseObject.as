@@ -141,13 +141,17 @@ package io.newgrounds {
 			var propNames:Array = propertyNames;
 			var castTypesObj:Object = castTypes;
 
+			// make an empty version of this object to reference default values for properties that aren't provided in the import
+			var defaultObject = io.newgrounds.models.objects.ObjectFactory.CreateObject(objectName, null, core);
+
 			for (var i:int = 0; i < propNames.length; i++) {
 				var propertyName:String = propNames[i] as String;
 				
 				// Check if property exists in the import object
 				if (!(propertyName in importObject)) {
-					// Property not provided - keep existing value
-                    continue;
+					// Property not provided in import - keep default value
+					this[propertyName] = defaultObject[propertyName];
+					continue;
 				}
 				
 				var propertyValue:* = importObject[propertyName];
