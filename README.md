@@ -7,6 +7,7 @@ A comprehensive ActionScript 3.0 library for integrating Newgrounds.io API funct
 ## Table of Contents
 
 - [Installing the Library](#installing-the-library)
+- [Updating the Library](#updating-the-library)
 - [Using the Component Clips](#using-the-component-clips)
 - [Using the NGIO Class](#using-the-ngio-class)
 - [Advanced Use](#advanced-use)
@@ -205,6 +206,40 @@ NGIO components use fonts that are available in the `fonts/` directory. To match
 
 ---
 
+## Updating the Library
+
+When a new version is released, follow these steps to update an existing project.
+
+### Step 1: Remove the old compiled library
+
+Open your game's FLA and look in the **Library panel** for the old compiled library clip. Depending on which version you installed, it may be named **NgioClassLib SWF** (older) or **NgioClassLibCompiled** (newer). Right-click it and choose **Delete**.
+
+### Step 2: Bring in the new compiled library
+
+How you do this depends on which method you used originally:
+
+**If you use the Connector Component:**
+
+1. Open `bin/components_cs5.fla`
+2. Copy the new Connector Component from the **connector** frame
+3. Paste it into your game's FLA
+4. Flash will ask whether to replace the existing symbol in the library or keep the old one — choose **Replace**
+
+The Connector Component has the full compiled library baked in, so replacing it is all you need.
+
+**If you are not using the Connector Component:**
+
+1. Open `bin/components_cs5.fla`
+2. Drag the **NgioLibraryComponent** from the library panel directly onto your game's stage
+3. This imports the compiled library into your project
+4. You can immediately delete the NgioLibraryComponent from the stage — it only needs to touch the stage long enough to register in your library
+
+### Step 3: Check your other components
+
+Most components that had no bugs in the new release will continue working without changes. Any that are behaving unexpectedly should be replaced the same way as the Connector Component above — copy from `components_cs5.fla`, paste into your FLA, and choose **Replace** when prompted.
+
+---
+
 ## Using the Component Clips
 
 The library includes **bin/components_cs5.fla** with pre-built Flash components for common Newgrounds.io features. These components have the NewgroundsIO library pre-compiled inside them:
@@ -230,6 +265,8 @@ Alternatively, you can:
 ![The Component Parameters Section](./docs/componentParameters.png "The Component Parameters Section")
 
 These components can be edited and customized to better fit your project.
+
+> **Note on same-frame access:** Components register themselves with `NGIO`'s static references (`NGIO.connectorComponent`, `NGIO.scoreboardComponent`, etc.) after they are constructed. If your timeline code runs on the same frame the component first appears, the static reference may not be populated yet depending on layer ordering. To sidestep this, you can give a component an **instance name** in the Properties panel and use that name directly in your code instead of the static reference.
 
 ### The Connector Component ###
 
