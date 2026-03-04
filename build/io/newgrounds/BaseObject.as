@@ -150,12 +150,15 @@ package io.newgrounds {
 				// Check if property exists in the import object
 				if (!(propertyName in importObject)) {
 					// Property not provided in import - keep default value
-					this[propertyName] = defaultObject[propertyName];
+					if (defaultObject != null) {
+						this[propertyName] = defaultObject[propertyName];
+					}
+					// else: keep whatever the class-level initializer set
 					continue;
 				}
 				
 				var propertyValue:* = importObject[propertyName];
-				
+
 				// === STANDARD CAST AND ASSIGN ===
 				var castValue:* = castToExpectedType(propertyName, propertyValue);
 				this[propertyName] = castValue;		
@@ -167,14 +170,11 @@ package io.newgrounds {
                 // Create a new NgioError object using the factory
                 this.error = ObjectFactory.CreateObject("Error", importObject.error, this.core) as io.newgrounds.models.objects.NgioError;
             }
-            
 		}
-		
+
 		/**
 		 * Convert a property value to its correct type
-		 * JSON only has strings, numbers, booleans, arrays, and objects. We need to
-		 * convert these raw values to the correct model types
-		 * 
+		 *
 		 * @param propertyName Name of the property being cast (used to look up type info)
 		 * @param value The raw value from JSON
 		 * @return The value converted to the correct type

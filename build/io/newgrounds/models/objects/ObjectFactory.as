@@ -138,7 +138,7 @@ package io.newgrounds.models.objects {
                 
             }
 
-            if (coreReference) obj.core = coreReference;
+            if (obj != null && coreReference) obj.core = coreReference;
             
             // If object was created and data provided, import the data
             if (obj != null && objectData != null) {
@@ -265,7 +265,7 @@ package io.newgrounds.models.objects {
                 
             }
             
-            if (coreReference) comp.core = coreReference;
+            if (comp != null && coreReference) comp.core = coreReference;
             
             // If component was created and data provided, import the data
             if (comp != null && props != null) {
@@ -392,7 +392,7 @@ package io.newgrounds.models.objects {
                 
             }
             
-            if (coreReference) result.core = coreReference;
+            if (result != null && coreReference) result.core = coreReference;
             
             // If result was created and data provided, import the data
             if (result != null && props != null) {

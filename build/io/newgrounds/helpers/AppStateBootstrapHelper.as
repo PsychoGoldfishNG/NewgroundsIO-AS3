@@ -1,11 +1,13 @@
 package io.newgrounds.helpers {
 	
 	import flash.display.LoaderInfo;
+	import flash.external.ExternalInterface;
 	import flash.net.LocalConnection;
 	import flash.net.URLRequest;
 	import flash.net.URLVariables;
 	import flash.net.SharedObject;
-	
+	import io.newgrounds.NGJSON;
+
 	/**
 	 * AppStateBootstrapHelper
 	 *
@@ -43,39 +45,54 @@ package io.newgrounds.helpers {
 		}
 		
 		/**
-		 * Extracts ngio_session_id from the runtime URL query string.
+		 * Extracts ngio_session_id from the 'vars' JSON parameter in the runtime URL.
 		 */
 		public static function getSessionIdFromUrl():String {
+
 			var currentUrl:String = getRuntimeUrl();
 			if (currentUrl == null || currentUrl.length == 0) {
 				return null;
 			}
-			
+
 			try {
 				var request:URLRequest = new URLRequest(currentUrl);
 				var queryStart:int = request.url.indexOf("?");
 				if (queryStart == -1) {
 					return null;
 				}
-				
+
 				var query:String = request.url.substring(queryStart + 1);
-				if (query.length == 0) {
+
+				var variables:URLVariables = new URLVariables(query);
+
+				if (!variables.hasOwnProperty("props")) {
 					return null;
 				}
-				
-				var variables:URLVariables = new URLVariables(query);
-				if (variables.hasOwnProperty("ngio_session_id")) {
-					var sessionId:String = String(variables["ngio_session_id"]);
-					return (sessionId.length > 0) ? sessionId : null;
+
+				var props:Object = NGJSON.parse(String(variables["props"]));
+
+				if (!props.hasOwnProperty("vars")) {
+					return null;
 				}
+
+				var vars:Object = props["vars"];
+
+				if (vars == null || !vars.hasOwnProperty("ngio_session_id")) {
+					return null;
+				}
+
+				var sessionId:String = String(vars["ngio_session_id"]);
+				return (sessionId.length > 0) ? sessionId : null;
+
 			} catch (e:Error) {
 			}
-			
+
 			return null;
 		}
-		
+
 		/**
 		 * Returns the current runtime URL if available.
+		 * Tries LoaderInfo first, then falls back to window.location.href via ExternalInterface.
 		 */
 		public static function getRuntimeUrl():String {
 			try {
@@ -85,6 +102,17 @@ package io.newgrounds.helpers {
 				}
 			} catch (e:Error) {
 			}
+
+			try {
+				if (ExternalInterface.available) {
+					var jsUrl:String = ExternalInterface.call("function() { return window.location.href; }") as String;
+					if (jsUrl != null && jsUrl.length > 0) {
+						return jsUrl;
+					}
+				}
+			} catch (e:Error) {
+			}
+
 			return null;
 		}
 		

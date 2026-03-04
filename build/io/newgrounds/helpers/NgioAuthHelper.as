@@ -5,6 +5,7 @@ package io.newgrounds.helpers {
 	import io.newgrounds.SessionStatus;
 	import io.newgrounds.models.objects.ObjectFactory;
 	import io.newgrounds.models.results.App.checkSessionResult;
+	import io.newgrounds.models.results.App.startSessionResult;
 	import flash.net.navigateToURL;
 	import flash.net.URLRequest;
 	
@@ -115,7 +116,7 @@ package io.newgrounds.helpers {
 						return;
 					}
 
-					var result:io.newgrounds.models.results.App.checkSessionResult = response.getResult() as io.newgrounds.models.results.App.checkSessionResult;
+					var result:io.newgrounds.models.results.App.startSessionResult = response.getResult() as io.newgrounds.models.results.App.startSessionResult;
 					
 					if (result !== null && result.success === true) {
 						sessionStatus.status = SessionStatus.NOT_LOGGED_IN;
