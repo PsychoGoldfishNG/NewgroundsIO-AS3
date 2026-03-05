@@ -33,6 +33,8 @@ package io.newgrounds {
 	import io.newgrounds.helpers.HttpRequestHelper;
 	import io.newgrounds.helpers.HttpResponseHelper;
 	import io.newgrounds.helpers.CoreTransportHelper;
+
+	import io.newgrounds.BrowserConsole;
 	
 	public class Core {
 		
@@ -55,6 +57,12 @@ package io.newgrounds {
 		 * The server has limits to prevent abuse
 		 */
 		public static const MAX_QUEUE_SIZE:int = 10;
+
+		/**
+		 * The version of the library - used for debugging and error reporting
+		 */
+		public static const LIBRARY_VERSION:String = "1.0.3b";
+
 		
         //==================== PUBLIC PROPERTIES ====================
         
@@ -144,6 +152,10 @@ package io.newgrounds {
 			// Load the crossdomain policy file to allow HTTPS connections
 			// This must be done before making any HTTPS requests
 			Security.loadPolicyFile(POLICY_FILE_URL);
+
+			var hasEncryptionKey:Boolean = (encryptionKeyBytes != null && encryptionKeyBytes.length > 0);
+			
+			BrowserConsole.log("Newgrounds.io Core initialized with appId: " + appId + ", buildVersion: " + buildVersion + ", useDebugMode: " + useDebugMode + ", libraryVersion: " + LIBRARY_VERSION + " (AS3), hasEncryptionKey: " + hasEncryptionKey, false);
 		}
 		
 		//==================== PUBLIC METHODS ====================

@@ -4,10 +4,16 @@ package io.newgrounds {
 
 	public class BrowserConsole {
 
-		public static function log(message:String):void {
+		/**
+		 * Logs a message to the browser console (if available) and optionally to the Flash debug console.
+		 * @param message The message to log.
+		 * @param traceMessage Whether to also output the message to the Flash debug console using trace
+		 */
+		public static function log(message:String, traceMessage:Boolean = true):void {
 			if (ExternalInterface.available) {
 				ExternalInterface.call("console.log", message);
-			} else {
+			}
+			if (traceMessage) {
 				trace(message);
 			}
 		}
