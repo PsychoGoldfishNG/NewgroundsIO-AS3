@@ -1,3 +1,4 @@
 .claude/
 node_modules/
 bin/components_cs5.swf
+bin/components_cs5/
