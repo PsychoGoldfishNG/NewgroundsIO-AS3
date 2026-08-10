@@ -30,7 +30,15 @@ package io.newgrounds.helpers {
 			}
 			
 			if (appState.session.error != null) {
-				if (appState.session.error.code == Errors.CANCELLED_SESSION) {
+				if (appState.session.error.code == Errors.EXPIRED_SESSION) {
+					// The server rejected this session id. Report EXPIRED rather than a
+					// generic ERROR so callers can tell "start over" apart from "something
+					// broke", and clear the session-scoped data that is no longer valid.
+					if (onSessionCleared != null) {
+						onSessionCleared.call();
+					}
+					sessionStatus.status = SessionStatus.EXPIRED;
+				} else if (appState.session.error.code == Errors.CANCELLED_SESSION) {
 					if (onSessionCleared != null) {
 						onSessionCleared.call();
 					}

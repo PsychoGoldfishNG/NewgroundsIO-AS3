@@ -103,35 +103,10 @@ package io.newgrounds.helpers {
 			lastCheckSessionTime = new Date();
 			
 			if (!hasSession(core)) {
-				var startSessionComponent:* = ObjectFactory.CreateComponent("App", "startSession", null, core);
-				if (startSessionComponent == null) {
-					throw new Error("Could not create App.startSession component");
-				}
-				core.executeComponent(startSessionComponent as io.newgrounds.BaseComponent, function(response:io.newgrounds.models.objects.Response):void {
-					
-					if (!response || response.success !== true) {
-						sessionStatus.status = SessionStatus.ERROR;
-						sessionStatus.error = (response && response.error) ? response.error : Errors.getError();
-						callCallback(sessionStatus);
-						return;
-					}
-
-					var result:io.newgrounds.models.results.App.startSessionResult = response.getResult() as io.newgrounds.models.results.App.startSessionResult;
-					
-					if (result !== null && result.success === true) {
-						sessionStatus.status = SessionStatus.NOT_LOGGED_IN;
-					} else if (result !== null && result.error !== null) {
-						sessionStatus.status = SessionStatus.ERROR;
-						sessionStatus.error = result.error;
-					} else {
-						sessionStatus.error = Errors.getError();
-						sessionStatus.status = SessionStatus.ERROR;
-					}
-					callCallback(sessionStatus);
-				});
+				startNewSession(core, sessionStatus, callCallback);
 				return;
 			}
-			
+
 			var checkSessionComponent:* = ObjectFactory.CreateComponent("App", "checkSession", null, core);
 			if (checkSessionComponent == null) {
 				throw new Error("Could not create App.checkSession component");
@@ -152,7 +127,19 @@ package io.newgrounds.helpers {
 							sessionStatus.status = SessionStatus.NOT_LOGGED_IN;
 						}
 					} else if (result !== null && result.error !== null) {
-						if (result.error.code == Errors.CANCELLED_SESSION) {
+						if (result.error.code == Errors.EXPIRED_SESSION) {
+							// The server no longer recognises this session id. Throw it away and
+							// transparently start a fresh guest session, so callers are treated
+							// like a new user instead of being handed an error they can only
+							// recover from by retrying the same dead id forever.
+							core.appState.invalidateSession();
+							startNewSession(core, sessionStatus, callCallback);
+							return;
+						} else if (result.error.code == Errors.CANCELLED_SESSION) {
+							// Also dead server-side, but the cancellation is meaningful to the
+							// caller, so report it rather than silently starting over. Discarding
+							// it here is what lets the next checkSession() recover.
+							core.appState.invalidateSession();
 							sessionStatus.status = SessionStatus.LOGIN_CANCELLED;
 						} else {
 							sessionStatus.status = SessionStatus.ERROR;
@@ -202,6 +189,45 @@ package io.newgrounds.helpers {
 			core.appState.clearSession();
 		}
 		
+		/**
+		 * Requests a brand new guest session and reports the outcome through callCallback.
+		 *
+		 * Shared by the "we have no session yet" path and the expired-session recovery
+		 * path, so both report identical statuses for identical server responses.
+		 *
+		 * NOTE: this deliberately bypasses the checkSession throttle. It only ever runs
+		 * as a single follow-up to a call that already passed the throttle, so it cannot
+		 * loop - if the startSession itself fails, we report ERROR rather than retrying.
+		 */
+		private static function startNewSession(core:Core, sessionStatus:SessionStatus, callCallback:Function):void {
+			var startSessionComponent:* = ObjectFactory.CreateComponent("App", "startSession", null, core);
+			if (startSessionComponent == null) {
+				throw new Error("Could not create App.startSession component");
+			}
+			core.executeComponent(startSessionComponent as io.newgrounds.BaseComponent, function(response:io.newgrounds.models.objects.Response):void {
+
+				if (!response || response.success !== true) {
+					sessionStatus.status = SessionStatus.ERROR;
+					sessionStatus.error = (response && response.error) ? response.error : Errors.getError();
+					callCallback(sessionStatus);
+					return;
+				}
+
+				var result:io.newgrounds.models.results.App.startSessionResult = response.getResult() as io.newgrounds.models.results.App.startSessionResult;
+
+				if (result !== null && result.success === true) {
+					sessionStatus.status = SessionStatus.NOT_LOGGED_IN;
+				} else if (result !== null && result.error !== null) {
+					sessionStatus.status = SessionStatus.ERROR;
+					sessionStatus.error = result.error;
+				} else {
+					sessionStatus.error = Errors.getError();
+					sessionStatus.status = SessionStatus.ERROR;
+				}
+				callCallback(sessionStatus);
+			});
+		}
+
 		private static function hasSession(core:Core):Boolean {
 			if (core.appState.session == null ||
 				core.appState.session.id == null ||
