@@ -219,9 +219,23 @@ module.exports = {
         // Handle primitives that can't be null
         const dataType = this.getDataType(property);
         
-        // Number types may need to default to NaN (not-a-number) instead of null
+        // Numbers default to 0, matching the AS2 library.
+        //
+        // This was "NaN", which caused two problems:
+        //   1. toString() guards written as `this.id != 0` are always true for NaN, so a
+        //      default-constructed model rendered as "Medal #NaN".
+        //   2. More seriously, it changed the wire payload. toObject(excludeNulls) drops
+        //      values where `value == null`, but `NaN == null` is false, so NaN survived
+        //      and both JSON encoders emit it as null. An unset optional numeric therefore
+        //      went out as {"skip": null} from AS3 and {"skip": 0} from AS2.
+        //
+        // Nothing depends on a NaN sentinel - there are no isNaN checks in any model.
+        //
+        // Still open for the template rewrite: whether an unset optional numeric should be
+        // omitted from the payload entirely rather than sent as 0. That is a protocol
+        // question; this change only aligns the two libraries on the existing behaviour.
         if (dataType === "Number") {
-            return "NaN";
+            return "0";
         }
         
         // Boolean types may need to default to false instead of null

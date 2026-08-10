@@ -16,7 +16,7 @@ package io.newgrounds.models.results.Medal {
 		/**
 		 * The user's medal score.
 		 */
-public var medal_score:Number = NaN;
+public var medal_score:Number = 0;
 		
 		
 		//==================== CONSTRUCTOR ====================

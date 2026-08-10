@@ -16,12 +16,12 @@ package io.newgrounds.models.components.ScoreBoard {
 		/**
 		 * The numeric ID of the scoreboard.
 		 */
-		public var id:Number = NaN;
+		public var id:Number = 0;
 		
 		/**
 		 * The int value of the score.
 		 */
-		public var value:Number = NaN;
+		public var value:Number = 0;
 		
 		/**
 		 * An optional tag that can be used to filter scores via ScoreBoard.getScores

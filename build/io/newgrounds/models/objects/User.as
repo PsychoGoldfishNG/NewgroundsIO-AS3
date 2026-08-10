@@ -16,7 +16,7 @@ package io.newgrounds.models.objects {
 		/**
 		 * The user's numeric ID.
 		 */
-		public var id:Number = NaN;
+		public var id:Number = 0;
 		
 		/**
 		 * The user's textual name.

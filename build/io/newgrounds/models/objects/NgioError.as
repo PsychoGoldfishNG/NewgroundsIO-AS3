@@ -21,7 +21,7 @@ package io.newgrounds.models.objects {
 		/**
 		 * A code indicating the error type.
 		 */
-		public var code:Number = NaN;
+		public var code:Number = 0;
 		
 		
 		//==================== CONSTRUCTOR ====================

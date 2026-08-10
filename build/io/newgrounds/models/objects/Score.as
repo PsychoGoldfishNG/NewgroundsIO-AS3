@@ -21,7 +21,7 @@ package io.newgrounds.models.objects {
 		/**
 		 * The integer value of the score.
 		 */
-		public var value:Number = NaN;
+		public var value:Number = 0;
 		
 		/**
 		 * The score value in the format selected in your scoreboard settings.

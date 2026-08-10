@@ -138,8 +138,12 @@ package io.newgrounds.models.objects {
                 
             }
 
+            // The null check is required, not defensive: an unrecognised name falls through
+            // the switch leaving obj null, and BaseObject.importFromObject() calls this with
+            // a dotted objectName ("App.checkSession") that deliberately has no case here.
+            // Without it, assigning .core throws TypeError #1009 on every result import.
             if (obj != null && coreReference) obj.core = coreReference;
-            
+
             // If object was created and data provided, import the data
             if (obj != null && objectData != null) {
                 obj.importFromObject(objectData);
@@ -265,8 +269,10 @@ package io.newgrounds.models.objects {
                 
             }
             
+            // Null check required - an unrecognised component/method falls through the
+            // switch leaving comp null, and assigning .core would throw TypeError #1009.
             if (comp != null && coreReference) comp.core = coreReference;
-            
+
             // If component was created and data provided, import the data
             if (comp != null && props != null) {
                 comp.importFromObject(props);
@@ -392,8 +398,10 @@ package io.newgrounds.models.objects {
                 
             }
             
+            // Null check required - an unrecognised component/method falls through the
+            // switch leaving result null, and assigning .core would throw TypeError #1009.
             if (result != null && coreReference) result.core = coreReference;
-            
+
             // If result was created and data provided, import the data
             if (result != null && props != null) {
                 result.importFromObject(props);

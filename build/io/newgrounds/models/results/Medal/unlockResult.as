@@ -22,7 +22,7 @@ public var medal:Medal = null;
 		/**
 		 * The user's new medal score.
 		 */
-public var medal_score:Number = NaN;
+public var medal_score:Number = 0;
 		
 		
 		//==================== CONSTRUCTOR ====================
