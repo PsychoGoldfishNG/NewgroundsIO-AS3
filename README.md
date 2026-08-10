@@ -1193,6 +1193,12 @@ NGIO.core.executeQueue(function(responses:Array):void {
 - Newgrounds.io API Documentation: https://www.newgrounds.io/
 - ActionScript 3.0 Documentation: https://help.adobe.com/en_US/FlashPlatform/reference/actionscript/3/
 
+### Working on the library itself?
+
+If you're modifying this library rather than using it, see **[CONTRIBUTING.md](CONTRIBUTING.md)** —
+it covers regenerating the model classes and rebuilding the pre-compiled component that the
+Connector, Library, and SWC install methods depend on.
+
 ---
 
 ## License
