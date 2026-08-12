@@ -248,8 +248,22 @@ package io.newgrounds {
 			var redirectComponents:Array = partitionedQueue.redirectComponents;
 			var toExecute:Array = partitionedQueue.batchedExecuteWrappers;
 			
+			// Dispatch redirects WITHOUT the caller's callback.
+			//
+			// A redirect exchanges no JSON - it navigates the browser and then fires
+			// its callback with null. Passing the caller's callback here means a queue
+			// holding one redirect plus one normal component invokes that callback
+			// TWICE: once with null from the redirect, then once with the real
+			// Response from the batch below.
+			//
+			// Callers cannot defend against that, because the empty-queue case above
+			// legitimately calls back with null too - so a careful caller reads the
+			// first invocation as "nothing to do" and discards the real response.
+			//
+			// executeQueue() invokes the caller's callback EXACTLY ONCE, with either
+			// null or a Response. Redirects are fire-and-forget.
 			for each (var redirectComponent:BaseComponent in redirectComponents) {
-				executeComponent(redirectComponent, callback, thisArg);
+				executeComponent(redirectComponent);
 			}
 			
 			// Queue has been processed - clear it for next batch
@@ -463,8 +477,14 @@ package io.newgrounds {
 					// JSON parsing failed - create appropriate error
                     trace("JSON parsing error - " + error.message);
 
+                    // INVALID_RESPONSE (505), not INVALID_REQUEST (101). 101 is a
+                    // server-side code meaning "your request was malformed" - the
+                    // opposite of what happened here, where the request was fine and
+                    // the server's REPLY could not be parsed. 505 is the one code the
+                    // client raises rather than the server, and the import-failure
+                    // branch below already uses it correctly.
                     responseModel.error = Errors.getError(
-                        Errors.INVALID_REQUEST,
+                        Errors.INVALID_RESPONSE,
                         "Unable to parse JSON response"
                     );
 

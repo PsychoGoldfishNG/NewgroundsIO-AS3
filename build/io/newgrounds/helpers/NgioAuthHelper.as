@@ -149,9 +149,17 @@ package io.newgrounds.helpers {
 						sessionStatus.error = Errors.getError();
 					}
 				} else {
+					// The RESPONSE failed, so read the error off the response.
+					//
+					// This branch is only reachable when the outer check above failed,
+					// which means `result` is still the null it was initialised to -
+					// it is only ever assigned inside the success branch. Testing
+					// result.error here could therefore never pass, and a genuine
+					// response-level error was always discarded and replaced with a
+					// generic one. startNewSession() below has it right.
 					sessionStatus.status = SessionStatus.ERROR;
-					if (result !== null && result.error !== null) {
-						sessionStatus.error = result.error;
+					if (response !== null && response.error !== null) {
+						sessionStatus.error = response.error;
 					} else {
 						sessionStatus.error = Errors.getError();
 					}
