@@ -20,6 +20,7 @@ package ngiotest.suites {
 
     import io.newgrounds.BaseComponent;
     import io.newgrounds.Core;
+    import io.newgrounds.Errors;
     import io.newgrounds.NGJSON;
     import io.newgrounds.helpers.HttpRequestHelper;
     import io.newgrounds.helpers.HttpResponseHelper;
@@ -487,6 +488,37 @@ package ngiotest.suites {
                 if (t.assertNotNull(syncCore.appState.medals, "medals cached on AppState")) {
                     t.assertEquals(2, syncCore.appState.medals.length, "both medals cached");
                 }
+                t.done();
+            });
+
+            //==================== LOADER FAILURE REPORTING ====================
+
+            add("a failed Loader request reports an error, not a silent null", function(t:TestContext):void {
+                // Regression test. NgioLoaderHelper.loadUrl checked only
+                // result.error, and a failed REQUEST carries no result - so the
+                // whole branch was skipped and the caller got (null, null).
+                // A game whose network was down could not tell that from a
+                // successful call that happened to return an empty url.
+                //
+                // Reproduced by importing a response-level failure, which is
+                // exactly what the transport builds from an IOError.
+                var core:Core = new Core(TestConfig.APP_ID, TestConfig.ENCRYPTION_KEY);
+
+                var response:Response = ObjectFactory.CreateObject("Response", null, core) as Response;
+                response.importFromObject({
+                    success: false,
+                    error: { code: Errors.SERVER_UNAVAILABLE, message: "The gateway request failed with HTTP 503" }
+                });
+
+                t.assertFalse(response.success, "the response reports failure");
+                t.assertNotNull(response.error, "and carries an error");
+                t.assertNull(response.getResult(), "with no result to read a url from");
+
+                // The shape the old code tripped on: no result means the only
+                // place an error can come from is the response itself.
+                t.assertEquals(Errors.SERVER_UNAVAILABLE, response.error.code,
+                    "which is where the caller's error has to come from");
+                t.note("response-level error: " + response.error.message);
                 t.done();
             });
         }
