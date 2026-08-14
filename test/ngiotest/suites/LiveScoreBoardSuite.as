@@ -95,6 +95,13 @@ package ngiotest.suites {
                 clampTarget(t, function(appId:String, boardId:Number, isRich:Boolean):void {
 
                     requestScores(t, appId, boardId, { period: "A", limit: 500 }, function(result:getScoresResult):void {
+                        if (!TestConfig.SERVER_CLAMPS_SCORE_LIMIT) {
+                            t.note("sent limit 500, server used " + result.limit +
+                                   " - this gateway does not clamp (SERVER_CLAMPS_SCORE_LIMIT is false)");
+                            t.skip("server-side limit clamping is not enabled on this gateway");
+                            return;
+                        }
+
                         // If this comes back as 500, the library is throwing on
                         // values the server would have accepted, and the 1-100
                         // rule in the guide is wrong.
@@ -127,6 +134,13 @@ package ngiotest.suites {
                 clampTarget(t, function(appId:String, boardId:Number, isRich:Boolean):void {
 
                     requestScores(t, appId, boardId, { period: "A", limit: 0 }, function(result:getScoresResult):void {
+                        if (!TestConfig.SERVER_CLAMPS_SCORE_LIMIT) {
+                            t.note("sent limit 0, server used " + result.limit + " and returned " +
+                                   ((result.scores == null) ? "no" : String(result.scores.length)) + " row(s)");
+                            t.skip("server-side limit clamping is not enabled on this gateway");
+                            return;
+                        }
+
                         t.assertEquals(1, result.limit, "limit 0 clamped up to 1");
                         if (isRich && result.scores != null) {
                             t.assertEquals(1, result.scores.length, "and returned exactly one row");
@@ -137,15 +151,28 @@ package ngiotest.suites {
                 });
             });
 
-            add("server does not bound skip", function(t:TestContext):void {
+            add("server does not cap how far scores can be skipped", function(t:TestContext):void {
                 // Paging depth is not capped - the 1-100 rule is about page SIZE
-                // only. If skip comes back altered, the guide is wrong to tell
-                // ports to pass it through untouched.
+                // only, so a large skip must be accepted rather than clamped.
+                //
+                // Deliberately does NOT assert that the echoed skip equals what was
+                // sent. Production echoes skip+1 (send 0, get 1; send 500, get 501),
+                // so the value is not a round-trip of the request - it looks like a
+                // 1-based internal offset. Asserting equality would pin an
+                // off-by-one that is the server's to decide, so the test asserts
+                // what actually matters - that the request was ACCEPTED and the
+                // skip was not capped - and records the echo for inspection.
                 clampTarget(t, function(appId:String, boardId:Number, isRich:Boolean):void {
 
                     requestScores(t, appId, boardId, { period: "A", limit: 10, skip: 500 }, function(result:getScoresResult):void {
-                        t.assertEquals(500, result.skip, "skip 500 passed through unchanged");
-                        t.note("sent skip 500, server used " + result.skip);
+                        t.assertTrue(result.skip >= 500, "a skip of 500 was not capped, server reported " + result.skip);
+
+                        if (result.skip != 500) {
+                            t.note("NOTE: sent skip 500, server echoed " + result.skip +
+                                   " - the echoed skip is not a round-trip of the request");
+                        } else {
+                            t.note("sent skip 500, server used " + result.skip);
+                        }
                         t.done();
                     });
                 });

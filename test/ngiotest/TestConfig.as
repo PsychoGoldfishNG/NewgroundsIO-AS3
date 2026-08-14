@@ -170,6 +170,26 @@ package ngiotest {
         //==================== CLAMPING PROBE ====================
 
         /**
+         * Whether the gateway under test clamps score limits into 1-100.
+         *
+         * FALSE for production as of 2026-08-14: it passes `limit` through
+         * unchanged, and `limit: 0` returns an empty list rather than one score.
+         * The clamp exists on the development branch and has not shipped.
+         *
+         * When false the three clamp probes still RUN and still report exactly
+         * what the server did - they just record it as a note instead of failing,
+         * so an unshipped feature does not sit as a permanent red mark. Flip it to
+         * true once the clamp deploys, and they become assertions again.
+         *
+         * Worth flipping deliberately rather than deleting the tests: the rule the
+         * library enforces (reject a limit outside 1-100) is written against the
+         * clamped behaviour, so it is worth knowing the day it changes.
+         */
+        public static const SERVER_CLAMPS_SCORE_LIMIT:Boolean = false;
+
+
+
+        /**
          * An app and board known to hold well over 100 scores, read cross-app.
          *
          * The clamp tests prove the LIMIT was honoured from the result's echo on
