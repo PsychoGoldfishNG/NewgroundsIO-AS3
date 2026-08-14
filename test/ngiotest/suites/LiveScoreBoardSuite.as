@@ -16,6 +16,7 @@ package ngiotest.suites {
     import io.newgrounds.models.results.ScoreBoard.getScoresResult;
 
     import ngiotest.LiveSuite;
+    import ngiotest.TestConfig;
     import ngiotest.TestContext;
 
     public class LiveScoreBoardSuite extends LiveSuite {
@@ -85,27 +86,37 @@ package ngiotest.suites {
             // the normal API - which means the behaviour the library's validation
             // is designed around has never actually been checked.
             //
-            // No need to seed a board with 100+ scores: the result echoes the
-            // EFFECTIVE limit and skip back, so the clamp is observable from the
-            // echo alone on a board holding two rows.
+            // The echoed limit/skip prove what the server DECIDED on any board.
+            // Proving it actually stopped at 100 ROWS needs a board holding more
+            // than 100 scores, which no test app has - hence
+            // TestConfig.SCORE_RICH_APP_ID.
 
             add("server clamps an oversized limit to 100", function(t:TestContext):void {
-                var board:ScoreBoard = firstBoard();
-                if (board == null) {
-                    t.skip("no scoreboards loaded");
-                    return;
-                }
+                clampTarget(t, function(appId:String, boardId:Number, isRich:Boolean):void {
 
-                requestScores(t, board.id, { period: "A", limit: 500 }, function(result:getScoresResult):void {
-                    // If this ever comes back as 500, the library is throwing on
-                    // values the server would have accepted, and the 1-100 rule
-                    // in the guide is wrong.
-                    t.assertEquals(100, result.limit, "limit 500 clamped to 100");
-                    if (result.scores != null) {
-                        t.assertTrue(result.scores.length <= 100, "and no more than 100 rows came back");
-                    }
-                    t.note("sent limit 500, server used " + result.limit);
-                    t.done();
+                    requestScores(t, appId, boardId, { period: "A", limit: 500 }, function(result:getScoresResult):void {
+                        // If this comes back as 500, the library is throwing on
+                        // values the server would have accepted, and the 1-100
+                        // rule in the guide is wrong.
+                        t.assertEquals(100, result.limit, "limit 500 clamped to 100");
+
+                        if (result.scores == null) {
+                            t.note("sent limit 500, server used " + result.limit + " (no rows returned)");
+                        } else if (isRich) {
+                            // The real assertion, and only possible on a board
+                            // with more than 100 rows: a two-row board satisfies
+                            // "at most 100" without the clamp doing anything.
+                            t.assertEquals(100, result.scores.length,
+                                "and returned exactly 100 rows from a board that holds more");
+                            t.note("board " + boardId + " on " + appId + ": sent limit 500, server used " +
+                                   result.limit + " and returned " + result.scores.length + " rows");
+                        } else {
+                            t.assertTrue(result.scores.length <= 100, "and no more than 100 rows came back");
+                            t.note("sent limit 500, server used " + result.limit + ", got " + result.scores.length +
+                                   " rows - too few rows on this board to prove the row cap");
+                        }
+                        t.done();
+                    });
                 });
             });
 
@@ -113,16 +124,16 @@ package ngiotest.suites {
                 // The floor matters as much as the ceiling: a caller who means
                 // "none" silently gets one score. That is why the library rejects
                 // 0 rather than passing it through.
-                var board:ScoreBoard = firstBoard();
-                if (board == null) {
-                    t.skip("no scoreboards loaded");
-                    return;
-                }
+                clampTarget(t, function(appId:String, boardId:Number, isRich:Boolean):void {
 
-                requestScores(t, board.id, { period: "A", limit: 0 }, function(result:getScoresResult):void {
-                    t.assertEquals(1, result.limit, "limit 0 clamped up to 1");
-                    t.note("sent limit 0, server used " + result.limit);
-                    t.done();
+                    requestScores(t, appId, boardId, { period: "A", limit: 0 }, function(result:getScoresResult):void {
+                        t.assertEquals(1, result.limit, "limit 0 clamped up to 1");
+                        if (isRich && result.scores != null) {
+                            t.assertEquals(1, result.scores.length, "and returned exactly one row");
+                        }
+                        t.note("sent limit 0, server used " + result.limit);
+                        t.done();
+                    });
                 });
             });
 
@@ -130,16 +141,13 @@ package ngiotest.suites {
                 // Paging depth is not capped - the 1-100 rule is about page SIZE
                 // only. If skip comes back altered, the guide is wrong to tell
                 // ports to pass it through untouched.
-                var board:ScoreBoard = firstBoard();
-                if (board == null) {
-                    t.skip("no scoreboards loaded");
-                    return;
-                }
+                clampTarget(t, function(appId:String, boardId:Number, isRich:Boolean):void {
 
-                requestScores(t, board.id, { period: "A", limit: 10, skip: 500 }, function(result:getScoresResult):void {
-                    t.assertEquals(500, result.skip, "skip 500 passed through unchanged");
-                    t.note("sent skip 500, server used " + result.skip);
-                    t.done();
+                    requestScores(t, appId, boardId, { period: "A", limit: 10, skip: 500 }, function(result:getScoresResult):void {
+                        t.assertEquals(500, result.skip, "skip 500 passed through unchanged");
+                        t.note("sent skip 500, server used " + result.skip);
+                        t.done();
+                    });
                 });
             });
 
@@ -290,6 +298,30 @@ package ngiotest.suites {
         }
 
         /**
+         * Picks the board the clamp probes should run against.
+         *
+         * Prefers TestConfig.SCORE_RICH_APP_ID, which is the only way to tell a
+         * working row cap from a board that simply holds fewer than 100 rows.
+         * Falls back to a local board, where the echoed limit is still
+         * meaningful, and skips only when there is no board at all.
+         *
+         * Calls back as onTarget(appId, boardId, isRich) - appId empty for local.
+         */
+        private function clampTarget(t:TestContext, onTarget:Function):void {
+            if (TestConfig.SCORE_RICH_APP_ID != null && TestConfig.SCORE_RICH_APP_ID.length > 0) {
+                onTarget(TestConfig.SCORE_RICH_APP_ID, TestConfig.SCORE_RICH_BOARD_ID, true);
+                return;
+            }
+
+            var board:ScoreBoard = firstBoard();
+            if (board == null) {
+                t.skip("no scoreboards loaded");
+                return;
+            }
+            onTarget("", board.id, false);
+        }
+
+        /**
          * Calls ScoreBoard.getScores through Core, skipping the model's own
          * argument validation.
          *
@@ -298,11 +330,18 @@ package ngiotest.suites {
          * observe. Going through callComponent sends exactly what we ask, so the
          * server can answer for itself.
          *
+         * An empty appId reads this app's own board; otherwise the read is
+         * cross-app, and that app must have granted access to APP_ID.
+         *
          * Fails the test and finishes it on any error, so callers only handle
          * the success case.
          */
-        private function requestScores(t:TestContext, boardId:Number, params:Object, onResult:Function):void {
+        private function requestScores(t:TestContext, appId:String, boardId:Number, params:Object, onResult:Function):void {
             params.id = boardId;
+
+            if (appId != null && appId.length > 0) {
+                params.app_id = appId;
+            }
 
             core.callComponent("ScoreBoard.getScores", params, function(response:Response, callbackParams:*):void {
 
