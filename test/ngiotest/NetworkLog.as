@@ -98,7 +98,13 @@ package ngiotest {
                     continue;
                 }
 
-                lines.push("--- " + label + " ---");
+                // Name the component in the header. The log is a flat, time-ordered
+                // buffer with no request/response pairing, so a call still in flight
+                // when a test ends lands in the NEXT test's dump. Labelling makes
+                // that obvious instead of leaving the reader to notice that the
+                // first block answers a different component than the one that failed.
+                var componentLabel:String = describeComponents(body, entry.direction == "request");
+                lines.push("--- " + label + componentLabel + " ---");
 
                 var rendered:String = render(body, entry.direction == "request");
                 var chunks:Array = rendered.split("\n");
@@ -108,6 +114,70 @@ package ngiotest {
             }
 
             return lines;
+        }
+
+        /**
+         * Extracts the component name(s) a packet concerns, as " (Medal.unlock)"
+         * or " (Medal.getList, ScoreBoard.getScores)".
+         *
+         * Returns "" when nothing can be identified - a Loader redirect, an
+         * unparseable body - rather than guessing.
+         */
+        private static function describeComponents(raw:String, isRequest:Boolean):String {
+            var parsed:Object;
+            try {
+                parsed = NGJSON.parse(raw);
+            } catch (e:Error) {
+                return "";
+            }
+
+            if (parsed == null) {
+                return "";
+            }
+
+            var names:Array = [];
+
+            if (isRequest) {
+                collectComponentNames(parsed.hasOwnProperty("execute") ? parsed.execute : null, names);
+            } else {
+                collectComponentNames(parsed.hasOwnProperty("result") ? parsed.result : null, names);
+            }
+
+            if (names.length == 0) {
+                return "";
+            }
+
+            return " (" + names.join(", ") + ")";
+        }
+
+        /**
+         * Pushes any `component` values found on an execute or result entry,
+         * which may be a single object or an array of them.
+         */
+        private static function collectComponentNames(value:*, names:Array):void {
+            if (value == null) {
+                return;
+            }
+
+            if (value is Array) {
+                var list:Array = value as Array;
+                for (var i:int = 0; i < list.length; i++) {
+                    collectComponentNames(list[i], names);
+                }
+                return;
+            }
+
+            if (value.hasOwnProperty("component") && value.component != null) {
+                names.push(String(value.component));
+                return;
+            }
+
+            // A secure execute hides its component inside the encrypted blob, so
+            // an unlock or score post would otherwise show as an unlabelled
+            // packet - exactly the ones worth identifying.
+            if (value.hasOwnProperty("secure")) {
+                names.push("secure");
+            }
         }
 
         /**

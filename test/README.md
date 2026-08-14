@@ -172,6 +172,15 @@ Three things make this useful:
 - **Non-JSON responses print verbatim**, which is what you want when the server
   returns an HTML error page instead of JSON.
 
+> **Check the component name in the header before trusting a packet.** The log
+> is a flat, time-ordered buffer that is cleared at the start of each test — it
+> does not pair requests with responses. A call still in flight when a test ends
+> lands in the *next* test's dump, so a failure can show a packet that has
+> nothing to do with it. Each block is labelled `--- RESPONSE (Gateway.getVersion) ---`
+> for exactly this reason. Encrypted calls show as `(secure)`, since the
+> component name is inside the blob; the decrypted body appears in the packet
+> itself.
+
 Offline failures print no traffic (they make no requests), but assertion
 messages render models and objects as JSON rather than `[object Object]`, so
 the expected/actual comparison names the actual data.
