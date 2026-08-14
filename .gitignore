@@ -2,3 +2,9 @@
 node_modules/
 bin/components_cs5.swf
 bin/components_cs5/
+
+# Test build output. NgioUnitTest.swf is published from the .fla by the Flash
+# IDE, NgioUnitTest-standalone.swf is built by test/build-tests.ps1 - both are
+# rebuilt on demand from tracked sources.
+test/NgioUnitTest.swf
+test/NgioUnitTest-standalone.swf
