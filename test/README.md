@@ -1,6 +1,6 @@
 # NewgroundsIO-AS3 test suite
 
-171 tests across 16 suites, covering the class library in `../build`. It does
+170 tests across 16 suites, covering the class library in `../build`. It does
 **not** test the drag-and-drop components in `../src` — only the code a
 developer talks to directly (`NGIO`, `Core`, the models, the helpers).
 
@@ -65,7 +65,7 @@ Registration order in `initiator/NgioUnitTest.as` is deliberate: offline first
 (fastest, most precise failures), then gateway connectivity, then login, then
 everything that depends on a session.
 
-### Offline — no network, no login (95 tests)
+### Offline — no network, no login (101 tests)
 
 | Suite | What it pins down |
 |---|---|
@@ -77,7 +77,7 @@ everything that depends on a session.
 | `OfflineModelSuite` | Hand-written model behaviour: `toString`, session clearing, `ScoreBoard.getScores` argument validation, `Errors` codes, `AppState` status derivation |
 | `OfflineForeignGuardSuite` | The write guards on objects loaded from another app. Confirms `unlock`, `postScore`, `saveData`, `saveDataRaw` and `clearData` all throw on a foreign object — and that the reads (`loadDataRaw`, `getScores`) and every local object are left alone |
 
-### Live — real gateway (76 tests)
+### Live — real gateway (69 tests)
 
 | Suite | Needs login? | Notes |
 |---|---|---|

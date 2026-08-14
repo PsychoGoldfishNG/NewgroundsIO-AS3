@@ -65,6 +65,23 @@ package ngiotest {
         /** The one custom event configured on the test app */
         public static const CUSTOM_EVENT:String = "ngio_unit_test";
 
+        /**
+         * The domain the test app's official and author urls are expected to
+         * use.
+         *
+         * This is an assumption about THIS APP's configuration, not a rule of
+         * the API. Those two urls are generated when a project is created,
+         * using the values of whichever environment created it, and an author
+         * can edit them afterwards to point anywhere at all. Change this if the
+         * test app's urls are ever customised, and change it alongside
+         * Core.GATEWAY_URL when testing against a different environment.
+         *
+         * Deliberately not applied to loadMoreGames or loadNewgrounds: those are
+         * hardcoded server-side to production newgrounds.com by design, on every
+         * environment.
+         */
+        public static const SITE_DOMAIN:String = "newgrounds.com";
+
         /** The one custom referral configured on the test app */
         public static const CUSTOM_REFERRAL:String = "my_referral";
 

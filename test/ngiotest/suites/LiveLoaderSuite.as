@@ -34,7 +34,8 @@ package ngiotest.suites {
             add("resolves the author url", function(t:TestContext):void {
                 NGIO.loadAuthorUrl(false, function(url:String, error:*):void {
                     if (assertUrl(t, url, error, "author url", false)) {
-                        t.assertTrue(url.indexOf("newgrounds.com") > 0, "points at newgrounds.com");
+                        t.assertTrue(url.indexOf(TestConfig.SITE_DOMAIN) > 0,
+                            "points at " + TestConfig.SITE_DOMAIN);
                     }
                     t.done();
                 });
