@@ -1,6 +1,6 @@
 # NewgroundsIO-AS3 test suite
 
-136 tests across 14 suites, covering the class library in `../build`. It does
+169 tests across 16 suites, covering the class library in `../build`. It does
 **not** test the drag-and-drop components in `../src` — only the code a
 developer talks to directly (`NGIO`, `Core`, the models, the helpers).
 
@@ -65,7 +65,7 @@ Registration order in `initiator/NgioUnitTest.as` is deliberate: offline first
 (fastest, most precise failures), then gateway connectivity, then login, then
 everything that depends on a session.
 
-### Offline — no network, no login (84 tests)
+### Offline — no network, no login (95 tests)
 
 | Suite | What it pins down |
 |---|---|
@@ -75,8 +75,9 @@ everything that depends on a session.
 | `OfflineCryptoSuite` | **Decrypts what `Core` encrypted**, independently, using the same as3crypto primitives the server uses — AES-128-CBC, PKCS5, prepended IV, Base64. Also covers block-boundary padding, UTF-8, IV freshness, and the key not being consumed between calls |
 | `OfflineWireFormatSuite` | Builds the exact gateway envelope and reads canned server replies through the real importer. Confirms secure components serialise to `{secure:...}` only, `debug` is omitted when off, unknown result types are skipped, and results sync into `AppState` |
 | `OfflineModelSuite` | Hand-written model behaviour: `toString`, session clearing, `ScoreBoard.getScores` argument validation, `Errors` codes, `AppState` status derivation |
+| `OfflineForeignGuardSuite` | The write guards on objects loaded from another app. Confirms `unlock`, `postScore`, `saveData`, `saveDataRaw` and `clearData` all throw on a foreign object — and that the reads (`loadDataRaw`, `getScores`) and every local object are left alone |
 
-### Live — real gateway (52 tests)
+### Live — real gateway (74 tests)
 
 | Suite | Needs login? | Notes |
 |---|---|---|
@@ -87,7 +88,7 @@ everything that depends on a session.
 | `LiveMedalSuite` | yes | The encrypted `Medal.unlock` path, repeat unlocks, unknown-id rejection |
 | `LiveScoreBoardSuite` | yes | `postScore` (also encrypted), plus every documented `getScores` filter |
 | `LiveCloudSaveSuite` | yes | Write, read back over HTTP, structured round-trip, clear |
-| `LiveCrossAppSuite` | partly | Reads another app's data via the `app_id` parameter, and proves it cannot reach this app's caches |
+| `LiveCrossAppSuite` | partly | Reads another app's data via the `app_id` parameter, proves it cannot reach this app's caches, and checks that a foreign board forwards its `app_id` on reads while a foreign medal refuses to unlock |
 | `LiveLoaderSuite` | no | Resolves all five Loader URLs using the non-redirect form, so it doesn't open browser tabs |
 
 Tests needing a user report `[SKIP]` rather than `[FAIL]` when you run as a
@@ -260,26 +261,35 @@ Things worth knowing that aren't obvious from the code:
   anything carrying a foreign one — without that, reading another app's medal
   list replaced the local list wholesale and marked it loaded, so
   `NGIO.getMedals()` returned the wrong game's medals.
-- **No high-level API exposes `app_id`.** `NGIO.loadMedals()` and friends never
-  set it, and `ScoreBoard.getScores(filters)` has no filter for it either, so a
-  cross-app read currently has to go through `core.callComponent()` directly.
-  `LiveCrossAppSuite` does exactly that. Worth considering as an API gap.
+- **`NGIO.loadExternal*` is the supported route.** `loadExternalMedals`,
+  `loadExternalScores`, `loadExternalSaveSlots` and `loadExternalSaveSlot` hand
+  results straight to the caller and cache nothing. `loadMedals()` and friends
+  still take no `app_id`, deliberately — they exist to fill the caches, so a
+  foreign variant would need a second cache keyed by app id and an app id
+  argument on every reader.
 - **`ScoreBoard.getBoards` does not accept `app_id`**, so there is no supported
   way to discover another app's board ids — you have to know one already, which
   is why `TestConfig.READABLE_FOREIGN_SCOREBOARD_ID` is hardcoded.
 - **Objects returned by a cross-app read carry a live `core` pointing at *this*
-  app.** A foreign `Medal` still has `.unlock()` and a foreign `ScoreBoard`
-  still has `.postScore()`, and neither of those components accepts an
-  `app_id` — so calling them sends the foreign object's id against your own app.
-  Newgrounds ids are globally unique, so this fails cleanly (202 / 203) rather
-  than hitting the wrong record, but it is a confusing failure and worth knowing
-  before building on cross-app reads.
+  app**, so every write method now refuses them. `Medal.unlock`,
+  `ScoreBoard.postScore`, `SaveSlot.saveData`, `saveDataRaw` and `clearData`
+  throw when `isForeign()` is true. Reads are untouched: `SaveSlot.loadDataRaw`
+  fetches an absolute URL, and `ScoreBoard.getScores` forwards the `app_id` the
+  board came with.
+- **The `SaveSlot` guards prevent data loss, not just a confusing error.** Medal
+  and scoreboard ids are globally unique, so an unguarded write there is merely
+  rejected (202 / 203). `SaveSlot.id` is a per-app *slot number* and every app
+  has a slot 1, so an unguarded write through a foreign slot **succeeds** — it
+  overwrites your own save. `OfflineForeignGuardSuite` covers this specifically.
 
 ## Status
 
-**All 155 tests pass**, run from `NgioUnitTest.fla` in the Flash IDE against the
-live gateway with a signed-in user. Also compiles clean under `-strict=true`
-against Flash Player 10.2.
+**155 of the 169 tests are confirmed passing**, run from `NgioUnitTest.fla` in
+the Flash IDE against the live gateway with a signed-in user. The 14 added
+afterwards for the foreign-object write guards — `OfflineForeignGuardSuite`, plus
+three live cross-app cases — are compile-clean but have not been run yet.
+
+The whole suite compiles clean under `-strict=true` against Flash Player 10.2.
 
 Three bugs were found by the first full run and are fixed:
 
