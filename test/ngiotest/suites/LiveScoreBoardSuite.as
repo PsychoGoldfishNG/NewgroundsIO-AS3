@@ -156,12 +156,15 @@ package ngiotest.suites {
                 // only, so a large skip must be accepted rather than clamped.
                 //
                 // Deliberately does NOT assert that the echoed skip equals what was
-                // sent. Production echoes skip+1 (send 0, get 1; send 500, get 501),
-                // so the value is not a round-trip of the request - it looks like a
-                // 1-based internal offset. Asserting equality would pin an
-                // off-by-one that is the server's to decide, so the test asserts
-                // what actually matters - that the request was ACCEPTED and the
-                // skip was not capped - and records the echo for inspection.
+                // sent. Production echoed skip+1 for a while (send 0, get 1; send
+                // 500, get 501) - a server-side off-by-one, since fixed on the
+                // development branch and confirmed unused by any NGIO library.
+                //
+                // Asserting equality would have failed for a reason that was never
+                // the library's, so this asserts the contractual part - that a large
+                // skip is ACCEPTED and not capped - and notes any mismatch. The note
+                // disappearing is how the deploy gets noticed, without the test
+                // going red while the fix is in flight.
                 clampTarget(t, function(appId:String, boardId:Number, isRich:Boolean):void {
 
                     requestScores(t, appId, boardId, { period: "A", limit: 10, skip: 500 }, function(result:getScoresResult):void {
