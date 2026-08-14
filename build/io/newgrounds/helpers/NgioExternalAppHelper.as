@@ -54,7 +54,7 @@ package io.newgrounds.helpers {
 		 * @param core The active NGIO core instance
 		 * @param appId The other app's ID, which must have granted access
 		 * @param boardId The scoreboard ID, which must belong to that app
-		 * @param filters Optional period/limit/skip/tag/user filters, as per
+		 * @param filters Optional period/limit/skip/tag/social/user filters, as per
 		 *                ScoreBoard.getScores
 		 * @param callback Function called with (scores:Array, error)
 		 * @param thisArg Scope for the callback
@@ -62,7 +62,7 @@ package io.newgrounds.helpers {
 		public static function loadScores(core:Core, appId:String, boardId:Number, filters:Object = null, callback:Function = null, thisArg:* = null):void {
 			validate(core, appId);
 
-			var params:Object = buildScoreParams(filters);
+			var params:Object = buildScoreParams(core, filters);
 			params.app_id = appId;
 			params.id = boardId;
 
@@ -204,7 +204,7 @@ package io.newgrounds.helpers {
 		 * Normalizes the optional score filters, mirroring ScoreBoard.getScores so
 		 * cross-app reads accept the same options and validate them the same way.
 		 */
-		private static function buildScoreParams(filters:Object):Object {
+		private static function buildScoreParams(core:Core, filters:Object):Object {
 			var params:Object = {};
 
 			if (filters == null) {
@@ -228,9 +228,16 @@ package io.newgrounds.helpers {
 				params.tag = filters.tag;
 			}
 
-			// 'social' is deliberately not supported. It filters to the current
-			// user's friends who have played THIS app, which is meaningless when
-			// the scores belong to a different one.
+			// 'social' works cross-app. The friends list is a site-wide relation
+			// rather than a per-app one, so "me and my friends" means the same
+			// thing on another app's board - which makes a shared leaderboard
+			// across a series of games one of the more useful things this can do.
+			//
+			// Gated on a session for the same reason as the local path: the
+			// gateway ignores 'social' when it has no way to tell who "you" are.
+			if (core.hasSession() && filters.social === true) {
+				params.social = true;
+			}
 
 			if (filters.user_id !== undefined && filters.user_id !== null) {
 				if (typeof filters.user_id !== 'number') {

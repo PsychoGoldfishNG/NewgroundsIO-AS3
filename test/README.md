@@ -1,6 +1,6 @@
 # NewgroundsIO-AS3 test suite
 
-169 tests across 16 suites, covering the class library in `../build`. It does
+171 tests across 16 suites, covering the class library in `../build`. It does
 **not** test the drag-and-drop components in `../src` — only the code a
 developer talks to directly (`NGIO`, `Core`, the models, the helpers).
 
@@ -77,7 +77,7 @@ everything that depends on a session.
 | `OfflineModelSuite` | Hand-written model behaviour: `toString`, session clearing, `ScoreBoard.getScores` argument validation, `Errors` codes, `AppState` status derivation |
 | `OfflineForeignGuardSuite` | The write guards on objects loaded from another app. Confirms `unlock`, `postScore`, `saveData`, `saveDataRaw` and `clearData` all throw on a foreign object — and that the reads (`loadDataRaw`, `getScores`) and every local object are left alone |
 
-### Live — real gateway (74 tests)
+### Live — real gateway (76 tests)
 
 | Suite | Needs login? | Notes |
 |---|---|---|
@@ -88,7 +88,7 @@ everything that depends on a session.
 | `LiveMedalSuite` | yes | The encrypted `Medal.unlock` path, repeat unlocks, unknown-id rejection |
 | `LiveScoreBoardSuite` | yes | `postScore` (also encrypted), plus every documented `getScores` filter |
 | `LiveCloudSaveSuite` | yes | Write, read back over HTTP, structured round-trip, clear |
-| `LiveCrossAppSuite` | partly | Reads another app's data via the `app_id` parameter, proves it cannot reach this app's caches, and checks that a foreign board forwards its `app_id` on reads while a foreign medal refuses to unlock |
+| `LiveCrossAppSuite` | partly | Reads another app's data via the `app_id` parameter, proves it cannot reach this app's caches, and checks that a foreign board forwards its `app_id` (and accepts a `social` filter) on reads while a foreign medal refuses to unlock |
 | `LiveLoaderSuite` | no | Resolves all five Loader URLs using the non-redirect form, so it doesn't open browser tabs |
 
 Tests needing a user report `[SKIP]` rather than `[FAIL]` when you run as a
@@ -284,10 +284,11 @@ Things worth knowing that aren't obvious from the code:
 
 ## Status
 
-**155 of the 169 tests are confirmed passing**, run from `NgioUnitTest.fla` in
-the Flash IDE against the live gateway with a signed-in user. The 14 added
-afterwards for the foreign-object write guards — `OfflineForeignGuardSuite`, plus
-three live cross-app cases — are compile-clean but have not been run yet.
+**155 of the 171 tests are confirmed passing**, run from `NgioUnitTest.fla` in
+the Flash IDE against the live gateway with a signed-in user. The 16 added
+afterwards for the foreign-object write guards and cross-app `social` reads —
+`OfflineForeignGuardSuite`, plus five live cross-app cases — are compile-clean but
+have not been run yet.
 
 The whole suite compiles clean under `-strict=true` against Flash Player 10.2.
 

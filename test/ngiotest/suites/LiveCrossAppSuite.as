@@ -280,6 +280,57 @@ package ngiotest.suites {
                 });
             });
 
+            add("a cross-app read accepts the social filter", function(t:TestContext):void {
+                // 'social' is site-wide, not per-app: the friends list is a
+                // relation between users, so "me and my friends" means the same
+                // thing on another app's board. A social leaderboard shared
+                // across a series of games is the main reason to want this.
+                if (skipUnlessSignedIn(t)) {
+                    return;
+                }
+
+                NGIO.loadExternalScores(
+                    TestConfig.READABLE_FOREIGN_APP_ID,
+                    TestConfig.READABLE_FOREIGN_SCOREBOARD_ID,
+                    { period: "A", limit: 10, social: true },
+                    function(scores:Array, error:*):void {
+
+                        // An empty list is a legitimate pass - the user and their
+                        // friends may simply not have played that game. What is
+                        // being asserted is that the gateway ACCEPTS the filter on
+                        // a cross-app read, not that anyone scored.
+                        if (assertNoError(t, error, "social cross-app read succeeded")) {
+                            if (t.assertNotNull(scores, "scores returned")) {
+                                t.note("social read of board " + TestConfig.READABLE_FOREIGN_SCOREBOARD_ID +
+                                       " on app " + TestConfig.READABLE_FOREIGN_APP_ID +
+                                       " returned " + scores.length + " score(s)");
+                            }
+                        }
+                        assertLocalCachesIntact(t);
+                        t.done();
+                    });
+            });
+
+            add("a stamped board accepts the social filter too", function(t:TestContext):void {
+                // Same thing through the model rather than the NGIO helper -
+                // ScoreBoard.getScores must not gate 'social' on isForeign().
+                if (skipUnlessSignedIn(t)) {
+                    return;
+                }
+
+                var board:ScoreBoard = new ScoreBoard();
+                board.core = core;
+                board.id = TestConfig.READABLE_FOREIGN_SCOREBOARD_ID;
+                board.foreignAppId = TestConfig.READABLE_FOREIGN_APP_ID;
+
+                board.getScores({ period: "A", limit: 10, social: true }, function(scores:Array, error:*):void {
+                    if (assertNoError(t, error, "foreign board social read succeeded")) {
+                        t.assertNotNull(scores, "scores returned");
+                    }
+                    t.done();
+                });
+            });
+
             add("a foreign medal from the gateway refuses to unlock", function(t:TestContext):void {
                 // The offline suite proves the guard on a hand-stamped model.
                 // This proves the stamp is really applied end to end, so the
