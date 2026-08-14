@@ -123,7 +123,11 @@ package io.newgrounds.models.objects {
             componentParams.skip = filters.skip;
             
             // Handle social filter (friends only)
-            if (this.core && this.core.hasSession() && filters.social === true) {
+            //
+            // Skipped entirely for a foreign board: 'social' filters to the current
+            // user's friends who have played THIS app, which says nothing about who
+            // has played the app the board belongs to.
+            if (this.core && this.core.hasSession() && filters.social === true && !this.isForeign()) {
                 componentParams.social = true;
             }
             
@@ -162,6 +166,14 @@ package io.newgrounds.models.objects {
             
             // Add this scoreboard's ID
             componentParams.id = this.id;
+
+            // A board loaded from another app keeps reading from that app. Without
+            // forwarding the app_id the board came with, the gateway would look this
+            // id up against THIS app and reject it - and reading is the one thing
+            // cross-app access does allow, so make it work rather than refusing it.
+            if (this.isForeign()) {
+                componentParams.app_id = this.foreignAppId;
+            }
             
             var callbackParams:Object = {
                 callback: callback,
@@ -212,8 +224,11 @@ package io.newgrounds.models.objects {
          * @param tag Optional tag to associate with the score
          * @param callback Function to call when posting is complete
          * @param thisArg Context to use when calling the callback
+         * @throws ArgumentError if this scoreboard was loaded from another app
          */
         public function postScore(value:Number, tag:String = null, callback:Function = null, thisArg:* = null):void {
+            this.assertNotForeign("postScore()", "The gateway would reject this scoreboard id against this app.");
+
             var componentParams:Object = {
                 id: this.id,
                 value: value

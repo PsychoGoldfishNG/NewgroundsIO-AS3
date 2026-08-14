@@ -104,8 +104,11 @@ package io.newgrounds.models.objects {
          * Clears all data from this save slot.
          * @param callback Function to call when clearing is complete
          * @param thisArg Context to use when calling the callback
+         * @throws ArgumentError if this slot was loaded from another app
          */
         public function clearData(callback:Function = null, thisArg:* = null):void {
+            this.assertNotForeign("clearData()", "Slot numbers are per-app, so this would erase THIS app's slot " + this.id + " instead.");
+
             if (this.core) this.core.callComponent("CloudSave.clearSlot", {id: this.id}, function(response:io.newgrounds.models.objects.Response, callabckParams:*=null):void {
 
                 var error:NgioError = null;
@@ -133,6 +136,12 @@ package io.newgrounds.models.objects {
         
         /**
          * Loads the raw string data from the URL stored on this save slot.
+         *
+         * Deliberately NOT guarded against foreign slots. This reads the absolute
+         * URL the server handed back with the slot, so it needs no app context and
+         * works unchanged on another app's data - which is the point of being able
+         * to load another app's slots at all.
+         *
          * @param callback Function to call with the raw data string or null
          * @param thisArg Context to use when calling the callback
          */
@@ -176,8 +185,11 @@ package io.newgrounds.models.objects {
          * @param data The raw string data to save
          * @param callback Function to call when saving is complete
          * @param thisArg Context to use when calling the callback
+         * @throws ArgumentError if this slot was loaded from another app
          */
         public function saveDataRaw(data:String, callback:Function = null, thisArg:* = null):void {
+            this.assertNotForeign("saveDataRaw()", "Slot numbers are per-app, so this would overwrite THIS app's slot " + this.id + " instead.");
+
             if (this.core) this.core.callComponent("CloudSave.setData", {id: this.id, data: data}, function(response:io.newgrounds.models.objects.Response, callbackParams:*=null):void {
                 
                 var error:NgioError = null;
@@ -234,8 +246,13 @@ package io.newgrounds.models.objects {
          * @param data The object to encode and save
          * @param callback Function to call when saving is complete
          * @param thisArg Context to use when calling the callback
+         * @throws ArgumentError if this slot was loaded from another app
          */
         public function saveData(data:*, callback:Function = null, thisArg:* = null):void {
+            // Checked here as well as in saveDataRaw so the error names the method the
+            // caller actually used, and so a large object is not encoded before failing.
+            this.assertNotForeign("saveData()", "Slot numbers are per-app, so this would overwrite THIS app's slot " + this.id + " instead.");
+
             this.saveDataRaw(io.newgrounds.NGJSON.stringify(data), callback, thisArg);
         }
 		

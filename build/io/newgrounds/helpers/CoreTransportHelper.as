@@ -37,12 +37,14 @@ package io.newgrounds.helpers {
 					trace("NETWORK: Opening browser window to " + Core.GATEWAY_URL + " with target " + browserTarget);
 					trace("         Request Data: " + requestString);
 				}
+				core.reportNetworkActivity("request", requestString);
 				
 				navigateToURL(browserRequest, browserTarget);
 			} catch (e:Error) {
 				if (core.debugNetworkCalls) {
 					trace("NETWORK: Error opening browser window - " + e.message);
 				}
+				core.reportNetworkActivity("error", "Error opening browser window - " + e.message);
 			}
 			
 			if (callback != null) {
@@ -68,6 +70,7 @@ package io.newgrounds.helpers {
 					trace("NETWORK: Received response from server");
 					trace("         Response Data: " + loader.data);
 				}
+				core.reportNetworkActivity("response", loader.data as String);
 				core.forwardHTTPResponse(200, loader.data as String, callback, thisArg);
 			});
 			
@@ -75,6 +78,7 @@ package io.newgrounds.helpers {
 				if (core.debugNetworkCalls) {
 					trace("NETWORK: IOError occurred - " + event.text);
 				}
+				core.reportNetworkActivity("error", "IOError - " + event.text);
 				core.forwardHTTPResponse(500, null, callback, thisArg);
 			});
 			
@@ -82,6 +86,7 @@ package io.newgrounds.helpers {
 				if (core.debugNetworkCalls) {
 					trace("NETWORK: SecurityError occurred - " + event.text);
 				}
+				core.reportNetworkActivity("error", "SecurityError - " + event.text);
 				core.forwardHTTPResponse(403, null, callback, thisArg);
 			});
 			
@@ -90,11 +95,13 @@ package io.newgrounds.helpers {
 					trace("NETWORK: Sending request to " + Core.GATEWAY_URL);
 					trace("         Request Data: " + requestString);
 				}
+				core.reportNetworkActivity("request", requestString);
 				loader.load(request);
 			} catch (e:Error) {
 				if (core.debugNetworkCalls) {
 					trace("NETWORK: Error sending request - " + e.message);
 				}
+				core.reportNetworkActivity("error", "Error sending request - " + e.message);
 				core.forwardHTTPResponse(500, null, callback, thisArg);
 			}
 		}

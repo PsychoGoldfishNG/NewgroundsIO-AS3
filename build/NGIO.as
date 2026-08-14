@@ -18,6 +18,7 @@ package {
 	import io.newgrounds.helpers.NgioAuthHelper;
 	import io.newgrounds.helpers.NgioBootstrapHelper;
 	import io.newgrounds.helpers.NgioEventHelper;
+	import io.newgrounds.helpers.NgioExternalAppHelper;
 	import io.newgrounds.helpers.NgioGatewayHelper;
 	import io.newgrounds.helpers.NgioLoaderHelper;
 	import io.newgrounds.Core;
@@ -604,6 +605,69 @@ package {
 			return null;
 		}
 		
+		//==================== EXTERNAL (CROSS-APP) DATA ====================
+		// Read-only access to ANOTHER app's medals, scores and cloud saves.
+		//
+		// The other app's owner has to grant access in their Newgrounds project
+		// settings first. Results are passed to the callback and never cached:
+		// AppState describes the app this client is running as, and mixing a
+		// foreign medal list into it would make getMedals() return the wrong
+		// app's medals. Use these when you deliberately want someone else's data;
+		// use the ordinary load methods for your own.
+		//
+		// Every object returned carries foreignAppId, so it can be told apart
+		// from a local one later.
+
+		/**
+		 * Load the medal list belonging to another app
+		 *
+		 * @param appId The other app's ID, which must have granted access
+		 * @param callback Function called with (medals, error)
+		 * @param thisArg Scope for callback (optional)
+		 */
+		public static function loadExternalMedals(appId:String, callback:Function = null, thisArg:* = null):void {
+			NgioExternalAppHelper.loadMedals(core, appId, callback, thisArg);
+		}
+
+		/**
+		 * Load scores from a scoreboard belonging to another app
+		 *
+		 * You must already know the board ID - ScoreBoard.getBoards does not accept
+		 * an app ID, so another app's boards cannot be discovered at runtime.
+		 *
+		 * @param appId The other app's ID, which must have granted access
+		 * @param boardId The scoreboard ID, which must belong to that app
+		 * @param filters Optional period/limit/skip/tag/user filters, as per ScoreBoard.getScores
+		 * @param callback Function called with (scores, error)
+		 * @param thisArg Scope for callback (optional)
+		 */
+		public static function loadExternalScores(appId:String, boardId:Number, filters:Object = null, callback:Function = null, thisArg:* = null):void {
+			NgioExternalAppHelper.loadScores(core, appId, boardId, filters, callback, thisArg);
+		}
+
+		/**
+		 * Load the cloud save slot list belonging to another app
+		 *
+		 * @param appId The other app's ID, which must have granted access
+		 * @param callback Function called with (saveSlots, error)
+		 * @param thisArg Scope for callback (optional)
+		 */
+		public static function loadExternalSaveSlots(appId:String, callback:Function = null, thisArg:* = null):void {
+			NgioExternalAppHelper.loadSaveSlots(core, appId, callback, thisArg);
+		}
+
+		/**
+		 * Load a single cloud save slot belonging to another app
+		 *
+		 * @param appId The other app's ID, which must have granted access
+		 * @param slotId The slot number
+		 * @param callback Function called with (saveSlot, error)
+		 * @param thisArg Scope for callback (optional)
+		 */
+		public static function loadExternalSaveSlot(appId:String, slotId:Number, callback:Function = null, thisArg:* = null):void {
+			NgioExternalAppHelper.loadSaveSlot(core, appId, slotId, callback, thisArg);
+		}
+
 		//==================== SERVER UTILITIES & EVENTS ====================
 		// NOTE: Gateway and Event behavior is implemented in helper classes.
 		// NGIO methods here are intentionally thin wrappers.

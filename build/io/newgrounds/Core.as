@@ -71,6 +71,19 @@ package io.newgrounds {
          */
         public var debugNetworkCalls:Boolean = false;
 
+        /**
+         * Optional observer for raw gateway traffic, as
+         * function(direction:String, detail:String):void
+         *
+         * Where debugNetworkCalls only traces, this hands the same packets to
+         * your own code, so they can be attached to a log entry, shown in-game,
+         * or held against a failing test. Independent of debugNetworkCalls -
+         * either, both or neither may be enabled.
+         *
+         * `direction` is one of "request", "response" or "error".
+         */
+        public var networkObserver:Function = null;
+
 		//==================== READONLY PROPERTIES ====================
 		
 		/**
@@ -445,6 +458,26 @@ package io.newgrounds {
 			CoreTransportHelper.sendHttpRequest(this, requestString, callback, thisArg);
 		}
 		
+		/**
+		 * Hands a raw gateway packet to networkObserver, if one is attached.
+		 *
+		 * Called by the transport helper at the same points that honour
+		 * debugNetworkCalls. Failures in an observer are swallowed: a broken
+		 * logger must not take a live request down with it.
+		 *
+		 * @param direction "request", "response" or "error"
+		 * @param detail The raw payload, or an error description
+		 */
+		public function reportNetworkActivity(direction:String, detail:String):void {
+			if (networkObserver == null) {
+				return;
+			}
+			try {
+				networkObserver.call(null, direction, detail);
+			} catch (e:*) {
+			}
+		}
+
 		/**
 		 * Internal forwarding entry for transport helper event callbacks.
 		 */
