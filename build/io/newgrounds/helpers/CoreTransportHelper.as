@@ -1,6 +1,7 @@
 package io.newgrounds.helpers {
 	
 	import flash.events.Event;
+	import flash.events.HTTPStatusEvent;
 	import flash.events.IOErrorEvent;
 	import flash.events.SecurityErrorEvent;
 	import flash.net.URLLoader;
@@ -65,6 +66,16 @@ package io.newgrounds.helpers {
 			
 			var loader:URLLoader = new URLLoader();
 			
+			// Flash Player fires IOErrorEvent for any non-2xx and discards the
+			// body, so without capturing this every network failure looked like a
+			// 500 - a gateway that was actually rate-limiting (429) or briefly
+			// unavailable (503) reported as an internal server error.
+			// Often stays 0: the browser does not always expose a status.
+			var httpStatus:int = HttpStatusHelper.UNKNOWN_STATUS;
+			loader.addEventListener(HTTPStatusEvent.HTTP_STATUS, function(event:HTTPStatusEvent):void {
+				httpStatus = event.status;
+			});
+
 			loader.addEventListener(Event.COMPLETE, function(event:Event):void {
 				if (core.debugNetworkCalls) {
 					trace("NETWORK: Received response from server");
@@ -79,7 +90,13 @@ package io.newgrounds.helpers {
 					trace("NETWORK: IOError occurred - " + event.text);
 				}
 				core.reportNetworkActivity("error", "IOError - " + event.text);
-				core.forwardHTTPResponse(500, null, callback, thisArg);
+
+				// Report what the server actually said. Falls back to 500 only
+				// when no status was reported, since something did go wrong.
+				core.forwardHTTPResponse(
+					(httpStatus != HttpStatusHelper.UNKNOWN_STATUS) ? httpStatus : 500,
+					null, callback, thisArg
+				);
 			});
 			
 			loader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, function(event:SecurityErrorEvent):void {

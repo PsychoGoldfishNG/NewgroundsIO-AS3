@@ -1,6 +1,6 @@
 # NewgroundsIO-AS3 test suite
 
-178 tests across 16 suites, covering the class library in `../build`. It does
+183 tests across 16 suites, covering the class library in `../build`. It does
 **not** test the drag-and-drop components in `../src` — only the code a
 developer talks to directly (`NGIO`, `Core`, the models, the helpers).
 
@@ -65,7 +65,7 @@ Registration order in `initiator/NgioUnitTest.as` is deliberate: offline first
 (fastest, most precise failures), then gateway connectivity, then login, then
 everything that depends on a session.
 
-### Offline — no network, no login (106 tests)
+### Offline — no network, no login (111 tests)
 
 | Suite | What it pins down |
 |---|---|

@@ -10,6 +10,7 @@ package ngiotest.suites {
     import io.newgrounds.AppState;
     import io.newgrounds.Core;
     import io.newgrounds.Errors;
+    import io.newgrounds.helpers.HttpStatusHelper;
     import io.newgrounds.SessionStatus;
     import io.newgrounds.models.objects.Medal;
     import io.newgrounds.models.objects.NgioError;
@@ -336,6 +337,71 @@ package ngiotest.suites {
 
                 t.assertEquals(SessionStatus.SESSION_ID_PROVIDED, state.getSessionStatus().status,
                     "preauthenticated id is reported distinctly");
+                t.done();
+            });
+
+            //==================== HTTP STATUS MAPPING ====================
+            //
+            // Flash Player fires IOErrorEvent for any non-2xx and throws the body
+            // away, so the status code is the only thing distinguishing "the
+            // server is down" from "that file is gone". These pin the mapping.
+
+            add("maps known HTTP statuses onto Errors codes", function(t:TestContext):void {
+                t.assertEquals(Errors.BAD_REQUEST, HttpStatusHelper.codeForStatus(400), "400");
+                t.assertEquals(Errors.USER_FORBIDDEN, HttpStatusHelper.codeForStatus(403), "403");
+                t.assertEquals(Errors.NOT_FOUND, HttpStatusHelper.codeForStatus(404), "404");
+                t.assertEquals(Errors.TOO_MANY_REQUESTS, HttpStatusHelper.codeForStatus(429), "429");
+                t.assertEquals(Errors.SERVER_ERROR, HttpStatusHelper.codeForStatus(500), "500");
+                t.assertEquals(Errors.SERVER_UNAVAILABLE, HttpStatusHelper.codeForStatus(503), "503");
+                t.assertEquals(Errors.GATEWAY_TIMEOUT, HttpStatusHelper.codeForStatus(504), "504");
+                t.done();
+            });
+
+            add("falls back by status class for unlisted codes", function(t:TestContext):void {
+                // A 502 must still read as a server problem rather than an
+                // unrecognised code with a useless message.
+                t.assertEquals(Errors.SERVER_ERROR, HttpStatusHelper.codeForStatus(502), "502 is a server error");
+                t.assertEquals(Errors.SERVER_ERROR, HttpStatusHelper.codeForStatus(599), "599 is a server error");
+                t.assertEquals(Errors.BAD_REQUEST, HttpStatusHelper.codeForStatus(418), "418 is a bad request");
+                t.assertEquals(Errors.BAD_REQUEST, HttpStatusHelper.codeForStatus(451), "451 is a bad request");
+                t.done();
+            });
+
+            add("treats an unreported status as an invalid response", function(t:TestContext):void {
+                // 0 is the COMMON case in the browser plugin - Flash only sees a
+                // status where the host browser exposes one. It must never be
+                // mistaken for a real code.
+                t.assertEquals(Errors.INVALID_RESPONSE, HttpStatusHelper.codeForStatus(0),
+                    "no status reported");
+
+                var described:String = HttpStatusHelper.describe(0, "The gateway request");
+                t.assertTrue(described.indexOf("no HTTP status") >= 0,
+                    "and the message says so rather than inventing a code: " + described);
+                t.done();
+            });
+
+            add("treats a 2xx with a bad body as an invalid response", function(t:TestContext):void {
+                // The case a status code cannot diagnose: the request succeeded
+                // and the BODY was the problem. Only parsing catches it, so the
+                // message has to point at the body rather than the transport.
+                t.assertEquals(Errors.INVALID_RESPONSE, HttpStatusHelper.codeForStatus(200),
+                    "200 reaching the mapper means the body failed");
+
+                var described:String = HttpStatusHelper.describe(200, "The gateway request");
+                t.assertTrue(described.indexOf("body") >= 0,
+                    "and the message blames the body: " + described);
+                t.done();
+            });
+
+            add("builds an error carrying the status and any detail", function(t:TestContext):void {
+                var error:* = HttpStatusHelper.errorForStatus(503, "Loading scores", "Stream Error");
+
+                t.assertNotNull(error, "an error model is returned");
+                t.assertEquals(Errors.SERVER_UNAVAILABLE, error.code, "carries the mapped code");
+                t.assertTrue(error.message.indexOf("503") >= 0, "names the status");
+                t.assertTrue(error.message.indexOf("Loading scores") >= 0, "names what failed");
+                t.assertTrue(error.message.indexOf("Stream Error") >= 0, "keeps the underlying detail");
+                t.note(error.message);
                 t.done();
             });
         }

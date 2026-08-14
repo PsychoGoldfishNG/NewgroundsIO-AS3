@@ -9,11 +9,13 @@ package io.newgrounds.models.objects {
 	
 	import io.newgrounds.BaseObject;
 	import flash.events.Event;
+	import flash.events.HTTPStatusEvent;
 	import flash.events.IOErrorEvent;
 	import flash.net.URLLoader;
 	import flash.net.URLLoaderDataFormat;
 	import flash.net.URLRequest;
 	import io.newgrounds.Errors;
+	import io.newgrounds.helpers.HttpStatusHelper;
 	import io.newgrounds.models.objects.Response;
 	import io.newgrounds.models.objects.NgioError;
 	import io.newgrounds.models.results.CloudSave.setDataResult;	
@@ -158,6 +160,16 @@ package io.newgrounds.models.objects {
             var self:* = this;
             var loader:URLLoader = new URLLoader();
             loader.dataFormat = URLLoaderDataFormat.TEXT;
+
+            // Remembered so the IO error below can say WHY. Flash Player fires
+            // IOErrorEvent for any non-2xx and throws the body away, so without
+            // this a 404 and a 503 are both just "Stream Error #2032".
+            // Frequently stays 0 - the browser does not always expose a code.
+            var httpStatus:int = HttpStatusHelper.UNKNOWN_STATUS;
+            loader.addEventListener(HTTPStatusEvent.HTTP_STATUS, function(e:HTTPStatusEvent):void {
+                httpStatus = e.status;
+            });
+
             loader.addEventListener(Event.COMPLETE, function(e:Event):void {
                 self.error = null;
                 if (callback != null) {
@@ -166,7 +178,7 @@ package io.newgrounds.models.objects {
             });
             loader.addEventListener(IOErrorEvent.IO_ERROR, function(e:IOErrorEvent):void {
                 if (callback != null) {
-                    self.error = Errors.getError(Errors.INVALID_RESPONSE, "Failed to load SaveSlot data from URL: " + e.text, true);
+                    self.error = HttpStatusHelper.errorForStatus(httpStatus, "Loading this save slot's data", e.text);
                     callback.call(thisArg, null, self.error);
                 }
             });

@@ -33,6 +33,7 @@ package io.newgrounds {
 	import io.newgrounds.helpers.HttpRequestHelper;
 	import io.newgrounds.helpers.HttpResponseHelper;
 	import io.newgrounds.helpers.CoreTransportHelper;
+	import io.newgrounds.helpers.HttpStatusHelper;
 
 	import io.newgrounds.BrowserConsole;
 	
@@ -500,8 +501,11 @@ package io.newgrounds {
 			// Check HTTP status code
 			// 200-299 = success, anything else = error
 			if (statusCode < 200 || statusCode > 299) {
-				// HTTP error - create error model
-				responseModel.error = Errors.getError(statusCode);
+				// HTTP error. Mapped rather than used directly: Errors constants
+				// cover the common codes, but Errors.getError(502) would produce an
+				// unrecognised code with a useless message. codeForStatus() falls
+				// back by CLASS, so any 5xx still reads as a server problem.
+				responseModel.error = HttpStatusHelper.errorForStatus(statusCode, "The gateway request");
 			} else {
 				// HTTP succeeded - parse the response JSON
 				try {
@@ -516,9 +520,14 @@ package io.newgrounds {
                     // the server's REPLY could not be parsed. 505 is the one code the
                     // client raises rather than the server, and the import-failure
                     // branch below already uses it correctly.
-                    responseModel.error = Errors.getError(
-                        Errors.INVALID_RESPONSE,
-                        "Unable to parse JSON response"
+                    // The status was fine and the BODY was the problem - a proxy
+                    // interstitial, an error page, a truncated reply. The status
+                    // cannot tell us that, so say so explicitly and quote the
+                    // parser, which names the offending character and position.
+                    responseModel.error = HttpStatusHelper.errorForStatus(
+                        statusCode,
+                        "The gateway request",
+                        error.message
                     );
 
                     jsonObject = null;
