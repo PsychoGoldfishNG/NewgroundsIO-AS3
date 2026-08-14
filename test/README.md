@@ -1,6 +1,6 @@
 # NewgroundsIO-AS3 test suite
 
-173 tests across 16 suites, covering the class library in `../build`. It does
+178 tests across 16 suites, covering the class library in `../build`. It does
 **not** test the drag-and-drop components in `../src` — only the code a
 developer talks to directly (`NGIO`, `Core`, the models, the helpers).
 
@@ -65,13 +65,13 @@ Registration order in `initiator/NgioUnitTest.as` is deliberate: offline first
 (fastest, most precise failures), then gateway connectivity, then login, then
 everything that depends on a session.
 
-### Offline — no network, no login (101 tests)
+### Offline — no network, no login (106 tests)
 
 | Suite | What it pins down |
 |---|---|
 | `OfflineBaseObjectSuite` | Import/export for every model: type coercion, defaults on omitted fields, nested and `array-of-X` casting, error payloads, required-property validation |
 | `OfflineObjectFactorySuite` | Walks the full inventory — 11 objects, 25 components, 25 results — so a model added to the codebase but not to the factory's switch fails here rather than silently returning null |
-| `OfflineJsonSuite` | `NGJSON` round-trips: escapes, unicode, exponents, big timestamps. Reports whether the native or bundled parser is active |
+| `OfflineJsonSuite` | `NGJSON` round-trips: escapes, unicode, exponents, big timestamps. Reports whether the native or bundled parser is active. Also pins the parser's **strictness** — an HTML error page or trailing garbage must throw, not parse |
 | `OfflineCryptoSuite` | **Decrypts what `Core` encrypted**, independently, using the same as3crypto primitives the server uses — AES-128-CBC, PKCS5, prepended IV, Base64. Also covers block-boundary padding, UTF-8, IV freshness, and the key not being consumed between calls |
 | `OfflineWireFormatSuite` | Builds the exact gateway envelope and reads canned server replies through the real importer. Confirms secure components serialise to `{secure:...}` only, `debug` is omitted when off, unknown result types are skipped, and results sync into `AppState` |
 | `OfflineModelSuite` | Hand-written model behaviour: `toString`, session clearing, `ScoreBoard.getScores` argument validation, `Errors` codes, `AppState` status derivation |

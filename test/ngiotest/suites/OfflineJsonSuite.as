@@ -110,6 +110,92 @@ package ngiotest.suites {
                 t.assertEquals(big, NGJSON.parse(NGJSON.stringify({ v: big })).v, "millisecond timestamp");
                 t.done();
             });
+
+            //==================== REJECTING NON-JSON ====================
+            //
+            // Regression tests for a real defect. A cloud save url that returned
+            // an HTML page - a proxy interstitial, a CDN error, a captive portal -
+            // parsed to the NUMBER 0 instead of throwing:
+            //
+            //   parseValue()'s default branch sent ANY unrecognised character to
+            //   parseNumber(); parseNumber() consumed nothing, so it evaluated
+            //   Number(""), which is 0 rather than NaN, and the isNaN guard never
+            //   fired.
+            //
+            // SaveSlot.loadData() catches parse ERRORS and reports them, so the
+            // caller would have been told the load failed. It cannot catch a parse
+            // that succeeds wrongly - the game just receives 0.
+
+            add("rejects an HTML page instead of parsing it as a number", function(t:TestContext):void {
+                var html:String =
+                    "<!DOCTYPE html>\n<html>\n<head>\n\t<title>Dev Instance Switcher</title>\n" +
+                    "</head>\n<body>\n<h1>Select an instance</h1>\n</body>\n</html>";
+
+                var thrown:Error = t.assertThrows(function():void {
+                    NGJSON.parse(html);
+                }, "an HTML body is not valid JSON");
+
+                if (thrown != null) {
+                    t.note(thrown.message);
+                }
+                t.done();
+            });
+
+            add("rejects other non-JSON leading characters", function(t:TestContext):void {
+                // Every one of these used to reach parseNumber() and come back 0.
+                var samples:Array = ["<xml/>", "Not Found", "%PDF-1.4", "@", "'single quoted'"];
+
+                for each (var sample:String in samples) {
+                    (function(text:String):void {
+                        t.assertThrows(function():void {
+                            NGJSON.parse(text);
+                        }, "rejects <" + text + ">");
+                    })(sample);
+                }
+                t.done();
+            });
+
+            add("rejects trailing content after a valid value", function(t:TestContext):void {
+                // The nastier half: the document STARTS as valid JSON, so parsing
+                // stopped early and returned a plausible value. An error page that
+                // begins with a digit, or a truncated file followed by garbage,
+                // both land here.
+                t.assertThrows(function():void {
+                    NGJSON.parse("123<html>");
+                }, "number followed by markup");
+
+                t.assertThrows(function():void {
+                    NGJSON.parse("{\"a\":1} <!DOCTYPE html>");
+                }, "object followed by markup");
+
+                t.assertThrows(function():void {
+                    NGJSON.parse("[1,2][3,4]");
+                }, "two documents concatenated");
+                t.done();
+            });
+
+            add("still accepts valid documents with surrounding whitespace", function(t:TestContext):void {
+                // The trailing-content check must not reject legitimate padding -
+                // servers routinely send a trailing newline.
+                t.assertDoesNotThrow(function():void {
+                    NGJSON.parse("  {\"a\":1}  \n");
+                }, "leading and trailing whitespace is fine");
+
+                var decoded:Object = NGJSON.parse("\n\t[1,2,3]\r\n");
+                t.assertNotNull(decoded, "and the value still comes back");
+                t.assertEquals(3, (decoded as Array).length, "intact");
+                t.done();
+            });
+
+            add("accepts a bare number, which is a valid JSON document", function(t:TestContext):void {
+                // Guard against over-correcting: rejecting non-numeric leads must
+                // not start rejecting numbers at the top level.
+                t.assertStrictEquals(0, NGJSON.parse("0"), "zero");
+                t.assertStrictEquals(42, NGJSON.parse("42"), "positive integer");
+                t.assertStrictEquals(-7.5, NGJSON.parse("-7.5"), "negative decimal");
+                t.assertStrictEquals(1500, NGJSON.parse("1.5e3"), "exponent");
+                t.done();
+            });
         }
 
         //==================== HELPERS ====================

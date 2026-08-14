@@ -148,6 +148,19 @@ package ngiotest.suites {
                             return;
                         }
 
+                        // assertNotNull is not enough: 0 is not null. If the url
+                        // served something other than our JSON - a proxy page, a
+                        // CDN error - a lenient parse can hand back a primitive,
+                        // and reading .level off a Number throws from inside the
+                        // URLLoader handler. That loses t.done() and burns a
+                        // watchdog timeout instead of failing here with a reason.
+                        if (loaded is Number || loaded is String || loaded is Boolean) {
+                            t.fail("loadData returned the primitive <" + loaded + "> rather than an object" +
+                                   " - the slot url probably did not serve our JSON");
+                            t.done();
+                            return;
+                        }
+
                         t.assertEquals(7, loaded.level, "number survived");
                         t.assertEquals("Tester", loaded.name, "string survived");
                         t.assertStrictEquals(true, loaded.unlocked, "boolean survived");

@@ -147,9 +147,21 @@ class NGJSONParser {
 		skipWhitespace();
 		var value:* = parseValue();
 		skipWhitespace();
+
+		// Anything left over means this was not a JSON document, however well the
+		// leading part parsed. Without this check `123<html>` returns 123, and a
+		// server error page that happens to start with a digit reads as a
+		// successful parse.
+		if (index < length) {
+			throw new Error(
+				"JSON parse error: unexpected trailing content at position " + index +
+				" (" + describeHere() + ")"
+			);
+		}
+
 		return value;
 	}
-	
+
 	private function parseValue():* {
 		if (index >= length) {
 			throw new Error("JSON parse error: unexpected end of input");
@@ -169,8 +181,31 @@ class NGJSONParser {
 			case "n":
 				return parseLiteral("null", null);
 			default:
-				return parseNumber();
+				// Only a digit or a leading minus can begin a number. Falling
+				// through to parseNumber() for ANY other character was how an HTML
+				// error page became the number 0: parseNumber consumed nothing,
+				// Number("") is 0 rather than NaN, and the isNaN guard never fired.
+				// The caller then got a plausible-looking value instead of an error.
+				if (ch == "-" || (ch >= "0" && ch <= "9")) {
+					return parseNumber();
+				}
+				throw new Error(
+					"JSON parse error: unexpected character at position " + index +
+					" (" + describeHere() + ")"
+				);
 		}
+	}
+
+	/**
+	 * A short, safe excerpt of the input at the current position, for error
+	 * messages. Truncated because the input may be an entire HTML page.
+	 */
+	private function describeHere():String {
+		var excerpt:String = text.substr(index, 20);
+		if (index + 20 < length) {
+			excerpt += "...";
+		}
+		return excerpt;
 	}
 	
 	private function parseObject():Object {
