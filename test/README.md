@@ -1,6 +1,6 @@
 # NewgroundsIO-AS3 test suite
 
-170 tests across 16 suites, covering the class library in `../build`. It does
+173 tests across 16 suites, covering the class library in `../build`. It does
 **not** test the drag-and-drop components in `../src` — only the code a
 developer talks to directly (`NGIO`, `Core`, the models, the helpers).
 
@@ -77,7 +77,7 @@ everything that depends on a session.
 | `OfflineModelSuite` | Hand-written model behaviour: `toString`, session clearing, `ScoreBoard.getScores` argument validation, `Errors` codes, `AppState` status derivation |
 | `OfflineForeignGuardSuite` | The write guards on objects loaded from another app. Confirms `unlock`, `postScore`, `saveData`, `saveDataRaw` and `clearData` all throw on a foreign object — and that the reads (`loadDataRaw`, `getScores`) and every local object are left alone |
 
-### Live — real gateway (69 tests)
+### Live — real gateway (72 tests)
 
 | Suite | Needs login? | Notes |
 |---|---|---|
@@ -86,7 +86,7 @@ everything that depends on a session.
 | `LiveSessionSuite` | — | Establishes the session; contains the Passport flow |
 | `LiveAppDataSuite` | partly | Batch-loads medals/scoreboards/save slots, checks counts against `TestConfig`, verifies lookup-by-id returns cached instances |
 | `LiveMedalSuite` | yes | The encrypted `Medal.unlock` path, repeat unlocks, unknown-id rejection |
-| `LiveScoreBoardSuite` | yes | `postScore` (also encrypted), plus every documented `getScores` filter |
+| `LiveScoreBoardSuite` | yes | `postScore` (also encrypted), plus every documented `getScores` filter. Also probes the server's own `limit` clamping and `skip` handling through `callComponent`, since the model throws before those can reach the gateway |
 | `LiveCloudSaveSuite` | yes | Write, read back over HTTP, structured round-trip, clear |
 | `LiveCrossAppSuite` | partly | Reads another app's data via the `app_id` parameter, proves it cannot reach this app's caches, and checks that a foreign board forwards its `app_id` (and accepts a `social` filter) on reads while a foreign medal refuses to unlock |
 | `LiveLoaderSuite` | no | Resolves all five Loader URLs using the non-redirect form, so it doesn't open browser tabs |
