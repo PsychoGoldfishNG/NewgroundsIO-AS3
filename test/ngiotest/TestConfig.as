@@ -167,6 +167,31 @@ package ngiotest {
          */
         public static const UNREADABLE_FOREIGN_APP_ID:String = "59735:NNSlBwZV";
 
+        //==================== CLAMPING PROBE ====================
+
+        /**
+         * An app and board known to hold well over 100 scores, read cross-app.
+         *
+         * The clamp tests prove the LIMIT was honoured from the result's echo on
+         * any board. Proving the server actually stopped at 100 ROWS needs a board
+         * with more than 100 rows in it - "at most 100" is satisfied trivially by
+         * a board holding two.
+         *
+         * EMPTY BY DEFAULT, deliberately. With no board configured the tests fall
+         * back to a local one, check the echo, and say in their note that the row
+         * cap is unproven - so a green run never claims more than it verified.
+         * Setting this to a board that turns out to hold FEWER than 100 rows would
+         * fail the run for a reason that has nothing to do with the library.
+         *
+         * To enable it: pick a board you know is full, and make sure its app has
+         * granted read access to APP_ID. Verified working against a board with
+         * enough rows - limit 500 came back as limit 100 with exactly 100 rows.
+         */
+        public static const SCORE_RICH_APP_ID:String = "";
+
+        /** A board on SCORE_RICH_APP_ID holding more than 100 scores */
+        public static const SCORE_RICH_BOARD_ID:int = 0;
+
         //==================== TIMING ====================
 
         /** Default watchdog for a single test */
