@@ -50,6 +50,12 @@ package ngiotest {
         private var pumping:Boolean = false;
         private var advanceRequested:Boolean = false;
 
+        /** Set once the pause before the next live case has been served */
+        private var paced:Boolean = false;
+
+        /** Timer for that pause, held so it can be cancelled on abort */
+        private var pacingTimer:Timer;
+
         //==================== TALLIES ====================
 
         public var passedCount:int = 0;
@@ -107,6 +113,8 @@ package ngiotest {
         public function run(onComplete:Function = null):void {
             this.onComplete = onComplete;
             this.startedAt = new Date().time;
+
+            NetworkLog.resetTotals();
 
             Reporter.header("NewgroundsIO-AS3 Unit Tests");
             Reporter.line("Gateway:  " + TestConfig.gatewayUrl());
@@ -167,6 +175,16 @@ package ngiotest {
 
             Reporter.suite(activeSuite.suiteName);
 
+            // Say so when a suite runs at its own pace. Otherwise a run that
+            // takes 14 seconds longer than the last one looks like the gateway
+            // got slower, and a green result here means nothing unless the
+            // reader knows the spacing that produced it.
+            if (activeSuite.isLive && activeSuite.pacingMs >= 0 &&
+                activeSuite.pacingMs != TestConfig.LIVE_TEST_PACING_MS) {
+                Reporter.note("this suite is paced at " + activeSuite.pacingMs +
+                              "ms between cases, not the usual " + TestConfig.LIVE_TEST_PACING_MS + "ms");
+            }
+
             var self:TestRunner = this;
             try {
                 activeSuite.setUp(function():void {
@@ -206,6 +224,23 @@ package ngiotest {
             if (activeSuite == null) {
                 return;
             }
+
+            // Space out gateway traffic. Weak medicine - the limit counts
+            // connections per window, so pacing does not lower the count. See
+            // TestConfig.LIVE_TEST_PACING_MS before relying on it.
+            //
+            // Returning here leaves pump()'s loop with nothing to do, so it exits
+            // cleanly; the timer calls pump() again once the pause is served.
+            var pacing:int = (activeSuite.pacingMs >= 0)
+                           ? activeSuite.pacingMs
+                           : TestConfig.LIVE_TEST_PACING_MS;
+
+            if (activeSuite.isLive && pacing > 0 && !paced) {
+                paced = true;
+                startPacing(pacing);
+                return;
+            }
+            paced = false;
 
             caseIndex++;
 
@@ -291,6 +326,32 @@ package ngiotest {
 
         //==================== TIMEOUT WATCHDOG ====================
 
+        /**
+         * Waits the given interval, then resumes the runner.
+         *
+         * Deliberately separate from the per-test watchdog timer: that one is
+         * armed for the case currently running, and reusing it would cancel a
+         * live test's timeout the moment the next one was queued.
+         */
+        private function startPacing(milliseconds:int):void {
+            stopPacing();
+
+            var self:TestRunner = this;
+            pacingTimer = new Timer(milliseconds, 1);
+            pacingTimer.addEventListener(TimerEvent.TIMER, function(event:TimerEvent):void {
+                self.stopPacing();
+                self.pump();
+            });
+            pacingTimer.start();
+        }
+
+        private function stopPacing():void {
+            if (pacingTimer != null) {
+                pacingTimer.stop();
+                pacingTimer = null;
+            }
+        }
+
         private function startTimeout(milliseconds:int, context:TestContext):void {
             stopTimeout();
 
@@ -337,6 +398,14 @@ package ngiotest {
             Reporter.line("Skipped:    " + skippedCount);
             Reporter.line("Assertions: " + assertionCount);
             Reporter.line("Duration:   " + elapsedSeconds + "s");
+
+            // Reported because the gateway limits X connections within Y minutes
+            // and the suite is the only thing here that can measure its own draw
+            // on that budget. Offline-only runs sit at 0 and the line is quiet.
+            if (NetworkLog.totalRequests > 0) {
+                Reporter.line("Requests:   " + NetworkLog.totalRequests +
+                              " gateway calls (at least - see NetworkLog.totalRequests)");
+            }
 
             if (failedCount > 0) {
                 Reporter.blank();

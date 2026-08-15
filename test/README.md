@@ -102,6 +102,8 @@ Everything lives in `ngiotest/TestConfig.as`.
 |---|---|---|
 | `RUN_OFFLINE_TESTS` | `true` | |
 | `RUN_LIVE_TESTS` | `true` | `false` drops all live suites |
+| `LIVE_TEST_PACING_MS` | `100` | Pause between **live** cases, adding ~7s to a run. Offline suites are never paced. Weak protection by design — the gateway limits *connections per window*, so pacing does not lower the request count. Read the constant's comment; `0` is defensible |
+| `LOADER_PACING_MS` | `-1` | Pause before each **Loader** case only, overriding the above. `-1` uses the normal pace; kept as the worked example of `TestSuite.pacingMs` |
 | `USE_DEBUG_MODE` | `true` | Gateway validates without committing. Turn off only to verify persistence — then expect to re-lock medals on the server |
 | `REQUIRE_LOGIN` | `true` | `false` skips the Passport prompt and everything needing a user |
 | `CONFIRM_BEFORE_LIVE` | `true` | `false` goes straight online |
@@ -110,6 +112,40 @@ Everything lives in `ngiotest/TestConfig.as`.
 
 The expected counts (`EXPECTED_MEDAL_COUNT` and friends) are asserted against,
 so if the test app's configuration changes on Newgrounds, update them here.
+
+### Rate limiting
+
+The gateway rate limits by request count over a time window. The specific
+thresholds are deliberately not documented here — they are operational settings,
+and publishing them mostly helps someone work out what they can get away with.
+
+What matters for running these tests: a full run is dense enough to approach the
+limit, and has at times been refused on its own final request with an HTTP 429.
+That is a property of the suite's size, not a defect — no real game produces
+traffic like this. The summary reports a `Requests:` total for any run that
+touched the network, so if the suite grows the cost stays visible.
+
+A 429 near the end of a run is therefore expected rather than a regression. If
+it happens, wait a short while before re-running rather than retrying
+immediately. **If the count grows much further, split the run** rather than
+asking for more allowance.
+
+Two things worth knowing, since the failures were misleading while this was
+being diagnosed: it is a **count**, not a rate — spacing calls out does not help,
+because the same number of requests still lands in the same window. And it is
+not tied to any component: the failure follows whichever call happens to be last
+in the run, which for a long time made the `Loader` suite look guilty when it was
+simply at the end.
+
+That figure is a **floor**. It counts what the network observer saw, so it
+misses any session or preload calls the host made before the runner started,
+and it does not count `Loader` urls, which navigate rather than call the
+gateway.
+
+Because the limit counts connections rather than measuring a rate, spreading a
+run out does not protect it — the same requests land in the same window either
+way. What protects it is running one suite at a time and leaving a gap between
+runs. `LIVE_TEST_PACING_MS` is a courtesy, not a shield.
 
 ### Testing against a development gateway
 

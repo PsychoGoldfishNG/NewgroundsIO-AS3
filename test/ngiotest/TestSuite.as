@@ -42,6 +42,19 @@ package ngiotest {
         }
 
         /**
+         * Pause before each of this suite's cases, in milliseconds.
+         *
+         * Return -1 to use TestConfig.LIVE_TEST_PACING_MS like everything else.
+         * Override when one suite needs to be gentler than the rest - see
+         * LiveLoaderSuite, whose component appears to carry its own limit.
+         *
+         * Only consulted for live suites; offline suites are never paced.
+         */
+        public function get pacingMs():int {
+            return -1;
+        }
+
+        /**
          * Register test cases here by calling add(). Called once, immediately
          * before the suite runs, so a suite can look at global state (such as
          * whether a user is logged in) while deciding what to register.

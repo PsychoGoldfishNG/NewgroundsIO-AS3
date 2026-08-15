@@ -214,6 +214,37 @@ package ngiotest {
 
         //==================== TIMING ====================
 
+        /**
+         * Pause between LIVE test cases, in milliseconds. 0 disables pacing.
+         *
+         * READ THIS BEFORE TRUSTING IT. The gateway limits a COUNT of requests
+         * per window, not a rate, and a full run lands close to that count.
+         * Pacing cannot help: spreading the cases out makes the run longer
+         * without making it smaller, and the count is the only thing measured.
+         *
+         * Kept anyway, because it costs little and being gentle with someone
+         * else's server is the right default for a test suite that exists to
+         * hammer it. Setting it to 0 is entirely defensible.
+         *
+         * Offline suites are never paced - they make no requests, and slowing
+         * them would only make the suite feel broken.
+         */
+        public static const LIVE_TEST_PACING_MS:int = 100;
+
+        /**
+         * Pause before each Loader.* case specifically. -1 uses the value above.
+         *
+         * Back to -1 because the Loader suite turned out not to be special. It
+         * was slowed to 2000 while the 429s all appeared to land there; moving
+         * the suite earlier in the run showed those failures follow the RUN's
+         * request count, not the component - see the rate limiting section of
+         * README.md. The mechanism it was added to probe does not exist.
+         *
+         * Left in place rather than deleted: TestSuite.pacingMs is a reasonable
+         * thing to have, and this is the obvious worked example of using it.
+         */
+        public static const LOADER_PACING_MS:int = -1;
+
         /** Default watchdog for a single test */
         public static const TEST_TIMEOUT_MS:int = 20000;
 

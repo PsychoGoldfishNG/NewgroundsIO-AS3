@@ -38,6 +38,16 @@ package ngiotest {
         /** Set once attach() has installed the observer */
         private static var attached:Boolean = false;
 
+        /**
+         * Gateway requests seen since resetTotals(), across the whole run.
+         *
+         * Separate from `entries`, which the runner clears before every test.
+         * This one survives, so the summary can report what the run actually
+         * cost - the gateway limits X connections within Y minutes, and a run
+         * total is the only way to know how close the suite sits to that.
+         */
+        private static var requestTotal:int = 0;
+
         //==================== SETUP ====================
 
         /**
@@ -66,9 +76,37 @@ package ngiotest {
             return (entries.length == 0);
         }
 
+        /**
+         * Zero the run-wide request count. Called once when a run starts, NOT
+         * per test - reset() deliberately leaves this alone.
+         */
+        public static function resetTotals():void {
+            requestTotal = 0;
+        }
+
+        /**
+         * Gateway requests this run has made.
+         *
+         * A FLOOR, not an exact figure. It counts what the observer saw, so it
+         * misses anything the host sent before attach() - typically the session
+         * and preload calls a game makes before handing over to the runner. It
+         * also does not count Loader urls, which navigate rather than call the
+         * gateway.
+         */
+        public static function get totalRequests():int {
+            return requestTotal;
+        }
+
         //==================== CAPTURE ====================
 
         private static function record(direction:String, detail:String):void {
+            // Counted before the buffer trim below, which drops old entries to
+            // stay bounded. The total has to survive that - a run that made 180
+            // requests made 180 requests whether or not they are still shown.
+            if (direction == "request") {
+                requestTotal++;
+            }
+
             // Keep the buffer bounded. A test that loops requests should not be
             // able to push the interesting first exchange out of a failure dump
             // AND flood the Output panel, so drop from the middle instead.
