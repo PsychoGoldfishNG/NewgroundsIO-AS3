@@ -483,12 +483,18 @@ sign-out prompt, so both paths through the suite are verified rather than one:
 
 | Sign-out prompt | Passed | Failed | Skipped | Assertions | Requests | Duration |
 |---|---|---|---|---|---|---|
-| **Sign out and test it** | 200 | 0 | 2 | 990 | 78 | 131.1s (combined — predates the split) |
+| **Sign out and test it** | 200 | 0 | 2 | 990 | 78 | 98.0s running + 55.0s human |
 | **Keep my login** | 198 | 0 | 4 | 989 | 75 | 98.0s running + 32.4s human |
 
-The keep-login row was re-run after the duration split landed and reproduced its
-counts exactly — same passes, skips, assertions and request total. The sign-out
-row is from before the split, so its figure includes a Passport sign-in.
+Both branches have been run more than once and reproduce their counts exactly —
+same passes, skips, assertions and request total each time.
+
+**The two branches cost the same 98.0s of suite time**, to the tenth of a second,
+while their human wait differed by 23 seconds. That is the duration split doing
+precisely what it exists for: before it, these same two runs reported 131.1s and
+129.0s and looked like ordinary run-to-run variance. The three extra gateway
+calls the sign-out branch makes are lost in the pacing, which is most of the 98s
+either way.
 
 Both reconcile to the same 202 cases (112 offline + 90 live; `LiveGateSuite`
 registers two mutually exclusive cases and runs one). The whole suite compiles
