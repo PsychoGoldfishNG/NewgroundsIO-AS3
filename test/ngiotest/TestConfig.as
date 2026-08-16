@@ -217,28 +217,69 @@ package ngiotest {
         /**
          * Pause between LIVE test cases, in milliseconds. 0 disables pacing.
          *
-         * READ THIS BEFORE TRUSTING IT. The gateway limits a COUNT of requests
-         * per window, not a rate, and a full run lands close to that count.
-         * Pacing cannot help: spreading the cases out makes the run longer
-         * without making it smaller, and the count is the only thing measured.
+         * 750ms is a TEMPORARY measure, set at the gateway owner's direction to
+         * keep a full run inside the current allowance until the server-side
+         * limit is updated. Drop it back to 100 once that ships - AS2 carries
+         * the same value and the same instruction.
          *
-         * Kept anyway, because it costs little and being gentle with someone
-         * else's server is the right default for a test suite that exists to
-         * hammer it. Setting it to 0 is entirely defensible.
+         * It works because the limit is a count per TIME WINDOW: at roughly one
+         * request per case, spacing the cases out spreads a ~70-request run
+         * across enough seconds that it no longer piles into one window.
+         *
+         * This CORRECTS what this comment used to say - that pacing could not
+         * help because the limit counts requests rather than measuring a rate.
+         * That was the wrong lesson drawn from a real experiment; see
+         * LOADER_PACING_MS below for what the experiment actually showed.
+         *
+         * What is actually known, since this is a knob worth tuning from
+         * evidence rather than feel:
+         *
+         *   100ms   ~60 requests in ~25s   REFUSED on request 60   (2026-08-15)
+         *   1200ms  71 requests, no refusal                        (2026-08-16)
+         *   750ms   73 requests, no refusal, ~109s total           (2026-08-16)
+         *
+         * The 750ms row is a real result, not a projection: a full AS3 run made
+         * 73 gateway calls without a refusal, and the AS2 suite did the same on
+         * the same day. That is the current setting.
+         *
+         * Lowering it further is low-risk to try: since the run now stops itself
+         * at the first dead request, guessing too low costs a short burst of
+         * honest skips rather than a cascade of failures and false passes. See
+         * LiveSuite.stopLiveTesting.
+         *
+         * Two honest limits on it:
+         *
+         *  - It paces CASES, not calls. A test that makes three gateway calls
+         *    still bursts them. It happens to work out at close to one call per
+         *    case here, which is why per-case pacing is a good enough
+         *    approximation.
+         *  - It does not reduce the request COUNT. This is a way of staying
+         *    under the limit, not of making the suite cheaper.
+         *  - It dominates the run. At 750ms the pacing alone is ~69s of a ~109s
+         *    suite, so most of the wall clock is deliberate waiting rather than
+         *    work.
          *
          * Offline suites are never paced - they make no requests, and slowing
          * them would only make the suite feel broken.
+         *
+         * Declared const, so changing it means a recompile rather than an edit.
          */
-        public static const LIVE_TEST_PACING_MS:int = 100;
+        public static const LIVE_TEST_PACING_MS:int = 750;
 
         /**
          * Pause before each Loader.* case specifically. -1 uses the value above.
          *
-         * Back to -1 because the Loader suite turned out not to be special. It
-         * was slowed to 2000 while the 429s all appeared to land there; moving
-         * the suite earlier in the run showed those failures follow the RUN's
+         * -1 because the Loader suite turned out not to be special. It was
+         * slowed to 2000 while the 429s all appeared to land there; moving the
+         * suite earlier in the run showed those failures follow the RUN's
          * request count, not the component - see the rate limiting section of
-         * README.md. The mechanism it was added to probe does not exist.
+         * README.md.
+         *
+         * Worth being precise about WHY that failed, because pacing the whole
+         * run DOES work (see LIVE_TEST_PACING_MS). Slowing only the last suite
+         * leaves every request before it just as tightly packed, so the window
+         * is already spent before the pacing begins. The lesson was that pacing
+         * has to apply to the whole run, not that pacing is useless.
          *
          * Left in place rather than deleted: TestSuite.pacingMs is a reasonable
          * thing to have, and this is the obvious worked example of using it.
@@ -253,6 +294,21 @@ package ngiotest {
 
         /** How often to re-check the session while waiting for Passport */
         public static const SESSION_POLL_INTERVAL_MS:int = 4000;
+
+        /**
+         * How long to wait before a checkSession that MUST reach the server.
+         *
+         * NgioAuthHelper throttles checkSession to one server call every
+         * CHECKSESSION_THROTTLE_TIME (3) seconds. Inside that window it answers
+         * locally with a synthetic status and does NOT start a new session, so a
+         * test that needs a genuine round trip has to wait the throttle out
+         * first. This wait is not padding.
+         *
+         * Comfortably above 3000 rather than exactly 3000: the throttle compares
+         * wall-clock times, and landing on the boundary would make the test a
+         * coin flip. SESSION_POLL_INTERVAL_MS is 4000 for the same reason.
+         */
+        public static const SESSION_THROTTLE_WAIT_MS:int = 4000;
 
         //==================== DERIVED ====================
 

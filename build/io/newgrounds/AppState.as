@@ -168,8 +168,131 @@ package io.newgrounds {
 			this.host = AppStateBootstrapHelper.resolveHost();
 		}
 		
+		//==================== RESULT ERROR INSPECTION ====================
+
+		/**
+		 * Every component-level failure in a response, as {component, error} pairs.
+		 *
+		 * A gateway request has THREE independent layers at which it can fail, and
+		 * they mean different things:
+		 *
+		 *   1. TRANSPORT  no HTTP response arrived at all, or a non-2xx came back.
+		 *                 Core.onHTTPResponse builds the error; nothing below runs.
+		 *   2. ENVELOPE   response.success !== true. The request as a whole was
+		 *                 rejected - bad app id, malformed body, unparseable reply.
+		 *                 No component ran.
+		 *   3. COMPONENT  result.success !== true. THIS component failed. Others in
+		 *                 the same envelope may have succeeded perfectly well.
+		 *
+		 * Layer 3 exists because an envelope can carry several components at once,
+		 * so "did it work" is not one question - it is one question per component,
+		 * and the answer has to say WHERE. That is what this returns.
+		 *
+		 * Each entry names the component (from the result's objectName, e.g.
+		 * "CloudSave.loadSlots") alongside its error, so a partial failure can be
+		 * reported precisely rather than as an anonymous "something went wrong".
+		 *
+		 * @param response A Response model (or null)
+		 * @return Array of {component:String, error:NgioError}; empty if all succeeded
+		 */
+		public static function resultErrors(response:*):Array {
+			var found:Array = [];
+
+			if (response == null) {
+				return found;
+			}
+
+			// Both response shapes. A single component comes back as `result`, a
+			// queue of them as `resultList`, and loadData produces either
+			// depending on how many property names it was given.
+			var list:Array = response.getResultList();
+
+			if (list == null) {
+				collectResultError(response.getResult(), found);
+				return found;
+			}
+
+			for each (var entry:* in list) {
+				collectResultError(entry, found);
+			}
+
+			return found;
+		}
+
+		/**
+		 * The first component-level failure, or null if every component succeeded.
+		 *
+		 * What loadData hands its callback. Reporting the first rather than all of
+		 * them keeps the (appState, error) signature unchanged; callers wanting the
+		 * full picture have two better tools - resultErrors() for the detail, and
+		 * hasLoaded() to ask which properties actually arrived, since the ones that
+		 * succeeded are still cached.
+		 *
+		 * @param response A Response model (or null)
+		 * @return The first component's error, or null
+		 */
+		public static function firstResultError(response:*):* {
+			var found:Array = resultErrors(response);
+			return (found.length > 0) ? found[0].error : null;
+		}
+
+		/**
+		 * The error on one result, or null when it succeeded.
+		 *
+		 * A result that reports success !== true but carries no error still has to
+		 * produce something, or the caller is back to a silent failure.
+		 *
+		 * @param result A single BaseResult (or null)
+		 * @return The result's error, a synthesised INVALID_RESPONSE, or null
+		 */
+		public static function resultError(result:*):* {
+			if (result == null) {
+				return null;
+			}
+
+			if (result.success === true) {
+				return null;
+			}
+
+			if (result.error != null) {
+				return result.error;
+			}
+
+			return Errors.getError(Errors.INVALID_RESPONSE, null, false);
+		}
+
+		/**
+		 * Append one result's failure to `found`, if it failed.
+		 *
+		 * Private here; its AS2 twin is public only because AS2 cannot resolve a
+		 * private static from inside a nested function.
+		 */
+		private static function collectResultError(result:*, found:Array):void {
+			var error:* = resultError(result);
+
+			if (error == null) {
+				return;
+			}
+
+			// objectName is the component path the result belongs to. A result the
+			// factory could not type has none - and BaseObject's getter throws
+			// rather than returning null - but it is still worth reporting, just
+			// without a name.
+			var componentName:String = "(unidentified component)";
+
+			try {
+				if (result.objectName != null) {
+					componentName = String(result.objectName);
+				}
+			} catch (e:Error) {
+				// Leave the placeholder in place.
+			}
+
+			found.push({ component: componentName, error: error });
+		}
+
 		//==================== PUBLIC METHODS ====================
-		
+
 		/**
 		 * Bulk-load app data from the server (medals, scoreboards, versions, etc.)
 		 * 
@@ -204,11 +327,32 @@ package io.newgrounds {
 			// NOTE: Response.importFromObject() already processes results and calls setValueFromResult()
 			var self:AppState = this;
 			core.executeQueue(function(response:*):void {
-				// Get any error that occurred (if response is null or has error)
-				if (response != null && response.error != null) {
+				// A failed load surfaces at any of THREE levels, and all of them
+				// have to be checked - the same pattern NgioLoaderHelper.loadUrl,
+				// Medal.unlock and ScoreBoard.getScores use. See resultErrors()
+				// above for what the three layers mean.
+				//
+				// Only the envelope level was checked here. A request can succeed
+				// while an individual COMPONENT is refused, and that is the common
+				// case rather than an exotic one: ask for saveSlots or medalScore
+				// without being logged in and the gateway returns
+				//
+				//   {"success":true,"result":[{"data":{"success":false,
+				//     "error":{"code":110,"message":"User is not logged in."}}}]}
+				//
+				// - a successful response carrying a refused component. The caller
+				// got (appState, null): no data and no reason. A game would read
+				// that as "this user has no saves" rather than "this user is not
+				// signed in", and NGIO.loadSaveSlots / loadMedalScore /
+				// loadAppData all inherit it.
+				if (response == null) {
+					localError = Errors.getError(Errors.INVALID_RESPONSE, null, false);
+				} else if (response.error != null) {
 					localError = response.error;
+				} else {
+					localError = firstResultError(response);
 				}
-				
+
 				// Call the developer's callback with results
 				if (callback != null) {
 					callback.call(thisArg, self, localError);

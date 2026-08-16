@@ -48,6 +48,18 @@ package ngiotest {
          */
         private static var requestTotal:int = 0;
 
+        /**
+         * Requests that came back with nothing, since resetTotals().
+         *
+         * The signal the live suites use to decide the gateway has stopped
+         * answering. Deliberately counted HERE rather than inferred from an
+         * error code: the code for "nothing came back" is INVALID_RESPONSE,
+         * which is shared with "a 2xx whose body would not parse" - a real
+         * failure that must keep being reported as one. The observer sees the
+         * difference; the error does not.
+         */
+        private static var transportFailureTotal:int = 0;
+
         //==================== SETUP ====================
 
         /**
@@ -82,6 +94,19 @@ package ngiotest {
          */
         public static function resetTotals():void {
             requestTotal = 0;
+            transportFailureTotal = 0;
+        }
+
+        /**
+         * How many requests this run got no response to at all.
+         *
+         * Non-zero means the gateway stopped answering - rate limited,
+         * unreachable, or refused. Once that has happened nothing later in the
+         * run is trustworthy, which is why LiveSuite treats the first one as
+         * grounds to stop.
+         */
+        public static function get transportFailures():int {
+            return transportFailureTotal;
         }
 
         /**
@@ -105,6 +130,12 @@ package ngiotest {
             // requests made 180 requests whether or not they are still shown.
             if (direction == "request") {
                 requestTotal++;
+            }
+
+            // Both totals are counted before the buffer trim below, for the
+            // same reason: they describe the run, not what is still on screen.
+            if (direction == "error") {
+                transportFailureTotal++;
             }
 
             // Keep the buffer bounded. A test that loops requests should not be

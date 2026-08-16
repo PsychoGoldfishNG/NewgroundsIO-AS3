@@ -44,8 +44,6 @@ package ngiotest.suites {
 
                 // Unique per run, so a stale read cannot pass by accident.
                 writtenPayload = "ngio-as3-unit-test:" + new Date().time;
-                t.status("Writing to cloud save slot " + slot.id + "...");
-
                 slot.saveDataRaw(writtenPayload, function(error:*):void {
                     assertNoError(t, error, "saveDataRaw accepted");
                     t.done();
@@ -226,24 +224,18 @@ package ngiotest.suites {
                 });
             });
 
-            add("refuses cloud saves when signed out", function(t:TestContext):void {
-                if (isSignedIn) {
-                    t.skip("a user is signed in, so this path cannot be reached");
-                    return;
-                }
-
-                var slot:SaveSlot = new SaveSlot();
-                slot.core = core;
-                slot.id = TestConfig.TEST_SAVE_SLOT_ID;
-
-                slot.saveDataRaw("should not persist", function(error:*):void {
-                    t.assertNotNull(error, "guest write is refused");
-                    if (error != null) {
-                        t.note("server said: " + describeError(error));
-                    }
-                    t.done();
-                });
-            });
+            // REMOVED: "refuses cloud saves when signed out".
+            //
+            // It could never run. This suite is registered after sign-in, so its
+            // own guard - skip if isSignedIn - fired on every run a developer
+            // actually does, and the test reported [SKIP] "this path cannot be
+            // reached" forever. It was coverage on paper only.
+            //
+            // Both halves of what it meant to test now live where they are
+            // reachable: LiveNoSessionSuite covers the refusal with no session
+            // at all, and LiveGuestSuite covers it with a guest session and no
+            // user. Those two states behave differently and neither was
+            // previously exercised live.
         }
 
         override public function tearDown(done:Function):void {

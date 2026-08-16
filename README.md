@@ -602,6 +602,33 @@ NGIO.checkSession(function(status:io.newgrounds.SessionStatus):void {
 
 #### Important Timing Warnings
 
+**⚠️ Session-gated data reports an error, not an empty result:**
+
+`saveSlots` and `medalScore` require a signed-in user. Requested without one, the
+gateway refuses *those components individually* while the request around them
+succeeds — so the callback receives an error rather than empty data:
+
+```actionscript
+// No user signed in
+NGIO.loadSaveSlots(function(slots:Array, error:*):void {
+    // error.code is 110 "User is not logged in" with a guest session,
+    // or 102 "Missing required session_id" with no session at all.
+    //
+    // Check it. Treating a null/empty `slots` as "this player has no saves"
+    // and then writing fresh state over it is how save data gets lost.
+    if (error != null) {
+        promptSignIn();
+        return;
+    }
+    // ...
+}, this);
+```
+
+The same applies to `NGIO.loadMedalScore()` and to any `NGIO.loadAppData()` call
+that includes `saveSlots` or `medalScore`. Components in the same batch that do
+*not* need a session still load and stay cached — `AppState.hasLoaded()` reports
+which ones arrived.
+
 **⚠️ Loading Medals Before Session:**
 ```actionscript
 // WRONG - Called before user logs in

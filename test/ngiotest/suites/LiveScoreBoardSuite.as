@@ -218,8 +218,6 @@ package ngiotest.suites {
                 }
 
                 var value:Number = 1000 + Math.floor(Math.random() * 9000);
-                t.status("Posting a score of " + value + " to " + board.name + "...");
-
                 board.postScore(value, null, function(score:Score, error:*):void {
                     if (!assertNoError(t, error, "postScore accepted")) {
                         t.done();
@@ -272,6 +270,43 @@ package ngiotest.suites {
                             }
                             t.note(scores.length + " score(s) tagged 'unit-test'");
                         }
+                    }
+                    t.done();
+                });
+            });
+
+            add("accepts the social filter on a local board", function(t:TestContext):void {
+                // This suite covered every documented getScores filter EXCEPT
+                // 'social' on a local board - it was only ever exercised on
+                // cross-app reads, in LiveCrossAppSuite. That is precisely how a
+                // wrong change to it could survive long enough to be shipped.
+                //
+                // Asserted LOOSELY on purpose. A social read legitimately
+                // returns an empty list when the user and their friends have not
+                // played this game, so this asserts that the filter is ACCEPTED
+                // and the response is well formed - not that anybody scored.
+                if (skipUnlessSignedIn(t)) {
+                    return;
+                }
+
+                var socialBoard:ScoreBoard = firstBoard();
+                if (socialBoard == null) {
+                    t.skip("no scoreboards loaded");
+                    return;
+                }
+
+                socialBoard.getScores({ period: "A", limit: 10, social: true }, function(scores:Array, error:*):void {
+                    if (!assertNoError(t, error, "social getScores accepted")) {
+                        t.done();
+                        return;
+                    }
+
+                    if (t.assertNotNull(scores, "a scores array came back, even if empty")) {
+                        for each (var score:Score in scores) {
+                            t.assertIsType(score, Score, "entry is a Score model");
+                        }
+                        t.note("social read returned " + scores.length +
+                               " score(s) - an empty list is a valid result here");
                     }
                     t.done();
                 });

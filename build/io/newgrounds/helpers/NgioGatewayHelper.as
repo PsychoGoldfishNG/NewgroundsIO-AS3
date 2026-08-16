@@ -1,8 +1,9 @@
 package io.newgrounds.helpers {
 	
 	import io.newgrounds.Core;
+	import io.newgrounds.Errors;
 	import io.newgrounds.models.objects.ObjectFactory;
-	
+
 	/**
 	 * NgioGatewayHelper
 	 *
@@ -52,13 +53,32 @@ package io.newgrounds.helpers {
 					return;
 				}
 				
-				if (response == null) {
-					callback.call(thisArg, null, null);
-					return;
+				// All three failure layers, the same pattern Medal.unlock and
+				// AppState.loadData use.
+				//
+				// A null response - no HTTP reply at all - handed the caller
+				// (null, null): no pong and no reason, which reads as "the
+				// gateway answered with nothing" rather than "nothing answered".
+				// The component level was never checked at all, and 'pong' was
+				// returned alongside any envelope error rather than instead of
+				// it.
+				var error:* = null;
+
+				if (response == null || response.success !== true) {
+					error = (response != null && response.error != null)
+						? response.error
+						: Errors.getError();
+				} else {
+					var result:* = response.getResult();
+
+					if (result == null) {
+						error = Errors.getError(Errors.INVALID_RESPONSE);
+					} else if (result.success !== true) {
+						error = (result.error != null) ? result.error : Errors.getError();
+					}
 				}
-				
-				var error:* = (response.error !== null) ? response.error : null;
-				callback.call(thisArg, 'pong', error);
+
+				callback.call(thisArg, (error == null) ? 'pong' : null, error);
 			});
 		}
 		
@@ -73,20 +93,30 @@ package io.newgrounds.helpers {
 			}
 			
 			core.executeComponent(component as io.newgrounds.BaseComponent, function(response:io.newgrounds.models.objects.Response):void {
-				if (response == null) {
-					if (callback !== null) {
-						callback.call(thisArg, null, null);
-					}
-					return;
-				}
-				
-				var error:* = (response.error !== null) ? response.error : null;
-				var result:* = (response !== null && response.success === true) ? response.getResult() : null;
-				var resultValue = null;
+				// All three failure layers, the same pattern Medal.unlock and
+				// AppState.loadData use.
+				//
+				// A null response - no HTTP reply at all - handed the caller
+				// (null, null): no datetime and no reason. A component reporting
+				// success:false with no error object did the same, since only
+				// result.error was consulted.
+				var error:* = null;
+				var result:* = null;
 
-				if (error === null && result !== null && result.error !== null) {
-					error = result.error;
+				if (response == null || response.success !== true) {
+					error = (response != null && response.error != null)
+						? response.error
+						: Errors.getError();
+				} else {
+					result = response.getResult();
+
+					if (result == null) {
+						error = Errors.getError(Errors.INVALID_RESPONSE);
+					} else if (result.success !== true) {
+						error = (result.error != null) ? result.error : Errors.getError();
+					}
 				}
+
 				if (callback !== null) {
 					if (error !== null || result === null) {
 						callback.call(thisArg, null, error);

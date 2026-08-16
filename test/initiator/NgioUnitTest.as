@@ -29,10 +29,14 @@ package initiator {
     import ngiotest.suites.LiveCrossAppSuite;
     import ngiotest.suites.LiveGateSuite;
     import ngiotest.suites.LiveGatewaySuite;
+    import ngiotest.suites.LiveGuestSuite;
     import ngiotest.suites.LiveLoaderSuite;
     import ngiotest.suites.LiveMedalSuite;
+    import ngiotest.suites.LiveNoSessionSuite;
     import ngiotest.suites.LiveScoreBoardSuite;
     import ngiotest.suites.LiveSessionSuite;
+    import ngiotest.suites.LiveSignInSuite;
+    import ngiotest.suites.LiveSignOutSuite;
     import ngiotest.suites.OfflineBaseObjectSuite;
     import ngiotest.suites.OfflineCryptoSuite;
     import ngiotest.suites.OfflineForeignGuardSuite;
@@ -60,10 +64,15 @@ package initiator {
                 return;
             }
 
+            // inputButton2 / inputButtonLabel2 are OPTIONAL. A stage without
+            // them still runs everything except the tests that need a genuine
+            // either/or choice, which skip with a reason rather than hanging.
             instance = new NgioUnitTest(
                 findTextField(caller, "infoText"),
                 findButton(caller, "inputButton"),
-                findTextField(caller, "inputButtonLabel")
+                findTextField(caller, "inputButtonLabel"),
+                findButton(caller, "inputButton2"),
+                findTextField(caller, "inputButtonLabel2")
             );
         }
 
@@ -74,8 +83,9 @@ package initiator {
 
         //==================== CONSTRUCTOR ====================
 
-        public function NgioUnitTest(infoText:TextField, inputButton:InteractiveObject, inputButtonLabel:TextField) {
-            ui = new TestUI(infoText, inputButton, inputButtonLabel);
+        public function NgioUnitTest(infoText:TextField, inputButton:InteractiveObject, inputButtonLabel:TextField,
+                                     inputButton2:InteractiveObject = null, inputButtonLabel2:TextField = null) {
+            ui = new TestUI(infoText, inputButton, inputButtonLabel, inputButton2, inputButtonLabel2);
             ui.setInfo("Running tests...\n\nResults appear in the Output panel.");
 
             if (infoText == null) {
@@ -113,7 +123,43 @@ package initiator {
             // --- live: real gateway ---
             runner.addSuite(new LiveGateSuite());
             runner.addSuite(new LiveGatewaySuite());
+
+            // The three session states, in the only order they can be reached.
+            //
+            // Each of these MAKES the state it tests rather than waiting for a
+            // run that happens to be in it, so one run covers all three on any
+            // machine whatever the tester is logged into:
+            //
+            //   No session     parks the restored session locally, runs, puts
+            //                  it back. Nothing is ended, nothing is sent.
+            //   Session        proves a session can be obtained at all.
+            //   Guest session  parks any login, asks the gateway for a real
+            //                  guest session, ends it (which is where
+            //                  App.endSession is covered), then restores.
+            //   Sign-in        Passport, or confirms an existing login.
+            //
+            // BOTH no-session and guest MUST run before anything loads medals
+            // while signed in - each asserts that no medal comes back unlocked,
+            // which only holds while the cache reflects a sessionless read.
+            // Signing out is the one session state that CANNOT be manufactured -
+            // a remembered login needs a human to have signed in through
+            // Passport. So this suite is registered only when local storage
+            // actually holds one, rather than reporting a permanent skip on a
+            // machine that has none. It asks before doing anything, and keeping
+            // the login is the default.
+            //
+            // First, because the session has to still be there to end - and
+            // because signing out here means the rest of the run exercises the
+            // fresh-machine path, Passport sign-in included.
+            if (LiveSignOutSuite.hasRememberedLogin()) {
+                runner.addSuite(new LiveSignOutSuite());
+            }
+
+            runner.addSuite(new LiveNoSessionSuite());
             runner.addSuite(new LiveSessionSuite());
+            runner.addSuite(new LiveGuestSuite());
+            runner.addSuite(new LiveSignInSuite());
+
             runner.addSuite(new LiveAppDataSuite());
             runner.addSuite(new LiveMedalSuite());
             runner.addSuite(new LiveScoreBoardSuite());

@@ -10,13 +10,20 @@
  */
 package ngiotest {
 
+    import flash.events.TimerEvent;
+    import flash.utils.Timer;
+
     import io.newgrounds.Core;
+    import io.newgrounds.Errors;
     import io.newgrounds.models.objects.User;
 
     public class LiveSuite extends TestSuite {
 
         /** Guards the one-time NGIO.init() across every live suite */
         private static var didInit:Boolean = false;
+
+        /** Set once the gateway has stopped answering */
+        private static var gatewayStopped:Boolean = false;
 
         public function LiveSuite() {
             super();
@@ -107,13 +114,222 @@ package ngiotest {
             if (error == null) {
                 return t.assert(true, label);
             }
+
+            // A request that never got an answer is not a result about the
+            // library. Reporting it as a failure buries the real regressions -
+            // and worse, the tests around it that assert an ABSENCE go green,
+            // because an empty cache looks the same whether the guard worked or
+            // the load never happened.
+            if (isTransportFailure(error)) {
+                stopLiveTesting(t, label);
+                return false;
+            }
+
             t.fail(label + " -- gateway returned " + describeError(error));
+            return false;
+        }
+
+        /**
+         * True when this error means "no answer came back", rather than "the
+         * gateway answered and said no".
+         */
+        protected function isTransportFailure(error:*):Boolean {
+            if (error == null) {
+                return false;
+            }
+
+            // The unambiguous case: the gateway told us in so many words.
+            try {
+                if (error.code == Errors.TOO_MANY_REQUESTS) {
+                    return true;
+                }
+            } catch (e:Error) {
+                // A String or plain Error has no code. Fall through.
+            }
+
+            // Otherwise ask what the transport actually saw. Structural rather
+            // than matching on the message text, and it does not confuse
+            // "nothing came back" with "a 2xx whose body would not parse" -
+            // those share an error code but not an observer event. See
+            // NetworkLog.transportFailures.
+            return (NetworkLog.transportFailures > 0);
+        }
+
+        /**
+         * Skip this test and abandon the rest of the live run.
+         *
+         * Stopping early is the point rather than a side effect: the gateway
+         * limits a COUNT of requests per window, so continuing to fire tests at
+         * a gateway that has already refused us spends the next window's budget
+         * too, and turns a short cool-off into a long one.
+         */
+        protected function stopLiveTesting(t:TestContext, label:String):void {
+            var reason:String = "the gateway stopped answering (" +
+                NetworkLog.transportFailures + " request(s) got no response after " +
+                NetworkLog.totalRequests + " sent)";
+
+            if (!gatewayStopped) {
+                gatewayStopped = true;
+                t.note("STOPPING LIVE TESTS: " + reason +
+                    ". Most likely the request-count rate limit - wait a few minutes " +
+                    "before re-running, and do not re-run immediately, which spends " +
+                    "the next window as well.");
+
+                if (runner != null) {
+                    runner.abortLiveSuites(reason);
+                }
+            }
+
+            // Reported as the reason alone. The assertion label is phrased as a
+            // positive claim ("newgrounds url resolved without error"), so
+            // gluing it to a skip reason reads as a contradiction - and the
+            // Reporter already prints the test name, which identifies the test
+            // just as well.
+            t.skip(reason);
+        }
+
+        /**
+         * Skip immediately when the gateway has already given up on us.
+         *
+         * The runner skips whole live SUITES once aborted; this is for the
+         * remaining cases inside the suite that was running when it happened.
+         *
+         * @return true if the test was skipped and should return immediately
+         */
+        protected function skipIfGatewayStopped(t:TestContext):Boolean {
+            if (gatewayStopped) {
+                t.skip("the gateway stopped answering earlier in this run");
+                return true;
+            }
             return false;
         }
 
         /** The signed-in user, or null */
         protected function get user():User {
             return isSignedIn ? (NGIO.getUser() as User) : null;
+        }
+
+        //==================== SESSION STASHING ====================
+        //
+        // Two suites need the client to be in a session state it is not
+        // currently in, and neither can wait for the tester to be in the right
+        // one - the whole point is that a single run covers every state.
+        //
+        // Stashing is purely LOCAL. The gateway request envelope is built from
+        // appState.session.id (see Core.sendRequest), so clearing that id
+        // reproduces exactly the wire condition of a client with no session,
+        // without ending anything server-side and without disturbing the
+        // tester's login. Putting the id back restores it completely.
+        //
+        // What stashing CANNOT do is fake a guest session: "this session has no
+        // user" is a judgement the SERVER makes, so LiveGuestSuite stashes and
+        // then asks the gateway for a real guest session instead.
+
+        /** Session id parked by stashSession() */
+        private var stashedSessionId:String = null;
+
+        /** Whether anything was actually parked, so restore knows to act */
+        private var didStash:Boolean = false;
+
+        /**
+         * Locally forget the current session, remembering it for restoreSession().
+         *
+         * @return true if a session was parked; false when there was none to park
+         */
+        protected function stashSession():Boolean {
+            if (didStash) {
+                return true;
+            }
+
+            if (core == null || core.appState == null || core.appState.session == null) {
+                return false;
+            }
+
+            var currentId:String = core.appState.session.id;
+            if (currentId == null || currentId.length == 0) {
+                return false;
+            }
+
+            stashedSessionId = currentId;
+            didStash = true;
+
+            // Clearing the whole session object rather than just the id, so
+            // hasUser() goes false too. keepAlive returns early unless hasUser(),
+            // which stops the interval firing a ping into the window we just
+            // opened.
+            core.appState.session.clearSessionData();
+
+            return true;
+        }
+
+        /**
+         * Put back whatever stashSession() parked. Safe to call when nothing was.
+         *
+         * Restores the id only - the user is re-attached by the server on the
+         * next checkSession, which is also what re-verifies the session is
+         * still alive.
+         */
+        protected function restoreSession():void {
+            if (!didStash) {
+                return;
+            }
+
+            if (core != null && core.appState != null && core.appState.session != null) {
+                core.appState.session.id = stashedSessionId;
+            }
+
+            didStash = false;
+            stashedSessionId = null;
+        }
+
+        /** The id parked by stashSession(), or null */
+        protected function get stashedId():String {
+            return stashedSessionId;
+        }
+
+        /** True while a session is parked */
+        protected function get hasStashedSession():Boolean {
+            return didStash;
+        }
+
+        //==================== THROTTLE WAIT ====================
+
+        /** One-shot wait used to sit out the checkSession throttle */
+        private var throttleTimer:Timer;
+
+        /**
+         * Run something once the checkSession throttle has expired.
+         *
+         * NgioAuthHelper throttles checkSession to one server call every
+         * CHECKSESSION_THROTTLE_TIME (3) seconds. Inside that window it answers
+         * from local state and does NOT start a new session, so any test that
+         * needs a genuine round trip has to wait the throttle out first. That
+         * wait is never padding.
+         *
+         * Held on the instance so stopThrottleWait can cancel it, rather than
+         * leaving a timer running into the next suite if a case ends early.
+         */
+        protected function afterThrottle(action:Function):void {
+            stopThrottleWait();
+
+            throttleTimer = new Timer(TestConfig.SESSION_THROTTLE_WAIT_MS, 1);
+            throttleTimer.addEventListener(TimerEvent.TIMER, function(event:TimerEvent):void {
+                stopThrottleWait();
+                action.call(null);
+            });
+            throttleTimer.start();
+        }
+
+        protected function stopThrottleWait():void {
+            if (throttleTimer != null) {
+                throttleTimer.stop();
+                throttleTimer = null;
+            }
+        }
+
+        override public function tearDown(done:Function):void {
+            stopThrottleWait();
+            done.call(null);
         }
     }
 }

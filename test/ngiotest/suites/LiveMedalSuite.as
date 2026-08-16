@@ -38,8 +38,6 @@ package ngiotest.suites {
 
                 var scoreBefore:Number = NGIO.getMedalScore();
                 t.note("unlocking " + medal.toString() + " (was unlocked=" + medal.unlocked + ")");
-                t.status("Unlocking " + medal.name + "...");
-
                 medal.unlock(function(unlockedMedal:Medal, error:*):void {
                     if (!assertNoError(t, error, "unlock accepted by the server")) {
                         t.done();
@@ -75,6 +73,46 @@ package ngiotest.suites {
                 });
             });
 
+            add("unlocking one medal does not unlock another", function(t:TestContext):void {
+                // Needs two medals to mean anything: with only one there is no
+                // second, still-locked medal to check, so "the unlock landed on
+                // the right medal" and "the unlock did nothing at all" produce
+                // identical observations.
+                //
+                // The app has three now, so this runs. The guard stays because
+                // the medal count is server-side configuration that can change
+                // without anyone touching this repo, and a suite that quietly
+                // stops proving something is worse than one that says so.
+                if (TestConfig.EXPECTED_MEDAL_COUNT < 2) {
+                    t.skip("the test app has only " + TestConfig.EXPECTED_MEDAL_COUNT +
+                           " medal - two or more are needed to tell a targeted unlock from a no-op");
+                    return;
+                }
+
+                if (skipUnlessSignedIn(t)) {
+                    return;
+                }
+
+                var allMedals:Array = NGIO.getMedals();
+                if (allMedals == null || allMedals.length < 2) {
+                    t.skip("fewer than two medals were returned by the server");
+                    return;
+                }
+
+                var target:Medal = allMedals[0] as Medal;
+                var bystander:Medal = allMedals[1] as Medal;
+                var bystanderWasUnlocked:Boolean = bystander.unlocked;
+
+                target.unlock(function(unlockedMedal:Medal, error:*):void {
+                    if (assertNoError(t, error, "unlock accepted")) {
+                        t.assertTrue(target.unlocked, "the targeted medal is unlocked");
+                        t.assertEquals(bystanderWasUnlocked, bystander.unlocked,
+                            "the other medal's state was not touched");
+                    }
+                    t.done();
+                });
+            });
+
             add("rejects an unknown medal id", function(t:TestContext):void {
                 // The encrypted payload still has to reach the server intact for
                 // it to be able to tell us the id is wrong - so a 202 here is
@@ -98,25 +136,18 @@ package ngiotest.suites {
                 });
             });
 
-            add("refuses a session-gated unlock when signed out", function(t:TestContext):void {
-                if (isSignedIn) {
-                    t.skip("a user is signed in, so this path cannot be reached");
-                    return;
-                }
-
-                var medals:Array = NGIO.getMedals();
-                if (medals == null || medals.length == 0) {
-                    t.skip("no medals loaded");
-                    return;
-                }
-
-                (medals[0] as Medal).unlock(function(medal:Medal, error:*):void {
-                    t.assertNotNull(error, "guest unlock is refused");
-                    t.assertFalse(medal.unlocked, "medal not flagged unlocked");
-                    t.note("server said: " + describeError(error));
-                    t.done();
-                });
-            });
+            // REMOVED: "refuses a session-gated unlock when signed out".
+            //
+            // It could never run. This suite is registered after sign-in, so its
+            // own guard - skip if isSignedIn - fired on every run a developer
+            // actually does, and the test reported [SKIP] "this path cannot be
+            // reached" forever. It was coverage on paper only.
+            //
+            // Both halves of what it meant to test now live where they are
+            // reachable: LiveNoSessionSuite covers the refusal with no session
+            // at all, and LiveGuestSuite covers it with a guest session and no
+            // user. Those two states behave differently and neither was
+            // previously exercised live.
 
             add("re-reads the medal list after unlocking", function(t:TestContext):void {
                 // The list is updated in place, so cached Medal references held

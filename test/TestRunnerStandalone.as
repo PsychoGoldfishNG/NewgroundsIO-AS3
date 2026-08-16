@@ -32,6 +32,8 @@ package {
         private var infoText:TextField;
         private var inputButton:Sprite;
         private var inputButtonLabel:TextField;
+        private var inputButton2:Sprite;
+        private var inputButtonLabel2:TextField;
 
         public function TestRunnerStandalone() {
             if (stage != null) {
@@ -53,13 +55,15 @@ package {
             buildInterface();
 
             // Same constructor the .fla path ends up calling
-            NgioUnitTest.instance = new NgioUnitTest(infoText, inputButton, inputButtonLabel);
+            NgioUnitTest.instance = new NgioUnitTest(infoText, inputButton, inputButtonLabel,
+                                                     inputButton2, inputButtonLabel2);
         }
 
         //==================== INTERFACE ====================
 
         private function buildInterface():void {
             var body:TextFormat = new TextFormat("_sans", 13, 0x222222);
+            var buttonY:Number = stage.stageHeight - BUTTON_HEIGHT - MARGIN;
 
             infoText = new TextField();
             infoText.x = MARGIN;
@@ -76,28 +80,43 @@ package {
             infoText.defaultTextFormat = body;
             addChild(infoText);
 
-            inputButton = new Sprite();
-            inputButton.name = "inputButton";
-            inputButton.x = MARGIN;
-            inputButton.y = stage.stageHeight - BUTTON_HEIGHT - MARGIN;
-            inputButton.buttonMode = true;
-            inputButton.useHandCursor = true;
-            inputButton.graphics.beginFill(0xF08020);
-            inputButton.graphics.drawRoundRect(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT, 8, 8);
-            inputButton.graphics.endFill();
-            addChild(inputButton);
+            inputButton = makeButton("inputButton", MARGIN, buttonY, 0xF08020);
+            inputButtonLabel = makeButtonLabel(inputButton);
 
-            inputButtonLabel = new TextField();
-            inputButtonLabel.x = inputButton.x;
-            inputButtonLabel.y = inputButton.y + 7;
-            inputButtonLabel.width = BUTTON_WIDTH;
-            inputButtonLabel.height = BUTTON_HEIGHT;
-            inputButtonLabel.selectable = false;
+            // The second button is optional on a .fla stage, but the standalone
+            // build draws its own interface - so it may as well supply one, and
+            // run the either/or prompts the .fla path would skip.
+            inputButton2 = makeButton("inputButton2", MARGIN + BUTTON_WIDTH + MARGIN, buttonY, 0x5A6B7C);
+            inputButtonLabel2 = makeButtonLabel(inputButton2);
+        }
+
+        private function makeButton(name:String, x:Number, y:Number, colour:uint):Sprite {
+            var button:Sprite = new Sprite();
+            button.name = name;
+            button.x = x;
+            button.y = y;
+            button.buttonMode = true;
+            button.useHandCursor = true;
+            button.graphics.beginFill(colour);
+            button.graphics.drawRoundRect(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT, 8, 8);
+            button.graphics.endFill();
+            addChild(button);
+            return button;
+        }
+
+        private function makeButtonLabel(button:Sprite):TextField {
+            var label:TextField = new TextField();
+            label.x = button.x;
+            label.y = button.y + 7;
+            label.width = BUTTON_WIDTH;
+            label.height = BUTTON_HEIGHT;
+            label.selectable = false;
             // The label sits over the button, so it must not eat the click
-            inputButtonLabel.mouseEnabled = false;
-            inputButtonLabel.autoSize = TextFieldAutoSize.NONE;
-            inputButtonLabel.defaultTextFormat = new TextFormat("_sans", 13, 0xFFFFFF, true, null, null, null, null, "center");
-            addChild(inputButtonLabel);
+            label.mouseEnabled = false;
+            label.autoSize = TextFieldAutoSize.NONE;
+            label.defaultTextFormat = new TextFormat("_sans", 13, 0xFFFFFF, true, null, null, null, null, "center");
+            addChild(label);
+            return label;
         }
     }
 }

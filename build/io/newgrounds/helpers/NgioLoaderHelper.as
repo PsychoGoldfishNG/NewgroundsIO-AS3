@@ -55,8 +55,12 @@ package io.newgrounds.helpers {
 
 						if (result === null) {
 							error = Errors.getError(Errors.INVALID_RESPONSE);
-						} else if (result.error !== null) {
-							error = result.error;
+						} else if (result.success !== true) {
+							// success, not error: a refused component is not
+							// obliged to carry an error object, and testing only
+							// error let that case through as (null, null) again -
+							// the very failure the comment above describes.
+							error = (result.error !== null) ? result.error : Errors.getError();
 						} else {
 							url = result.url;
 						}

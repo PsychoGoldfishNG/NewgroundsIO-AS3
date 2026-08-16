@@ -38,6 +38,17 @@ package ngiotest {
         public var ui:TestUI;
 
         /**
+         * Set when this test put a prompt on screen and waited for a person.
+         *
+         * The runner subtracts such cases from the headline duration, because
+         * the interesting number is what the SUITE costs. A run left sitting on
+         * the live-testing gate reported its whole thinking time as suite time,
+         * which reads as a slow run rather than a distracted tester - and that
+         * figure is what gets used to judge whether the pacing is too high.
+         */
+        public var waitedForInput:Boolean = false;
+
+        /**
          * Optional hook invoked instead of the default "timed out" failure when
          * the runner's watchdog fires. Set it when a timeout is a legitimate
          * outcome rather than a fault - a prompt nobody answered, say. The hook
@@ -242,12 +253,52 @@ package ngiotest {
                 done();
                 return;
             }
+            waitedForInput = true;
             ui.setInfo(message);
             ui.showButton(buttonLabel, handler);
         }
 
         /**
-         * Update the on-stage status text without asking for input.
+         * Offer the user a genuine either/or choice, using both on-stage buttons.
+         *
+         * SKIPS rather than fails when the .fla has only one button, because
+         * unlike prompt() there is no sensible default: the whole point is that
+         * the test cannot know which branch the user wants. A one-button .fla is
+         * an older stage layout, not a broken one.
+         *
+         * Exactly one handler runs - showButtons() tears both down on the first
+         * click.
+         */
+        public function promptChoice(message:String, buttonLabel:String, handler:Function,
+                                     buttonLabel2:String, handler2:Function):void {
+            if (ui == null || !ui.hasButton) {
+                fail("Test needs the on-stage button but the .fla did not supply one");
+                done();
+                return;
+            }
+
+            if (!ui.hasButton2) {
+                skip("needs the second on-stage button (inputButton2) and this .fla has only one");
+                return;
+            }
+
+            waitedForInput = true;
+            ui.setInfo(message);
+            ui.showButtons(buttonLabel, handler, buttonLabel2, handler2);
+        }
+
+        /**
+         * Replace the on-stage text for the rest of THIS case.
+         *
+         * Reserved for telling a person what is being waited on after they have
+         * already interacted - the Passport poll is the only caller. It is not a
+         * progress display: the runner restores its own suite banner as soon as
+         * the case ends, and the Output panel is the report.
+         *
+         * It used to be called from a dozen tests ("Unlocking X...", "Loading app
+         * data...") and those were removed. Each message outlived the work it
+         * described, so the stage usually showed a line that had nothing to do
+         * with what the run was actually doing.
          */
         public function status(message:String):void {
             if (ui != null) {

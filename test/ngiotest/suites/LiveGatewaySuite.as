@@ -120,18 +120,23 @@ package ngiotest.suites {
                 });
             });
 
-            add("rejects an event the app does not define", function(t:TestContext):void {
-                // The gateway should refuse an unknown event name rather than
-                // silently accepting it, otherwise a typo in a game is invisible.
+            add("an event the app does not define is handled without throwing", function(t:TestContext):void {
+                // RENAMED from "rejects an event the app does not define", which
+                // this test never asserted and the gateway does not do. It passed
+                // every run while its own note said the opposite, so the [PASS]
+                // line told a reader scanning results that undefined event names
+                // are refused - the reverse of the truth.
+                //
+                // Confirmed with the API owner as deliberate: undefined event
+                // names fail silently, for legacy support. Recorded as an
+                // observation, not asserted either way - which side enforces the
+                // event list is a server policy decision, not a client contract.
                 NGIO.logEvent("definitely-not-a-real-event", function(error:*):void {
                     if (error == null) {
-                        t.note("gateway accepted an undefined event name without complaint");
+                        t.note("gateway accepted an undefined event name without complaint (this is the documented behaviour)");
                     } else {
                         t.note("gateway rejected the undefined event: " + describeError(error));
                     }
-                    // Recorded as an observation rather than a hard assertion:
-                    // which side enforces the event list is a server policy
-                    // decision, not a client contract.
                     t.assert(true, "undefined event name handled without throwing");
                     t.done();
                 });

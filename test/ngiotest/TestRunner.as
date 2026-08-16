@@ -69,8 +69,25 @@ package ngiotest {
         /** Wall-clock start, for a total duration in the summary */
         private var startedAt:Number = 0;
 
+        /** Wall-clock start of the case currently running */
+        private var caseStartedAt:Number = 0;
+
+        /**
+         * Total time spent inside tests that waited on a human.
+         *
+         * Subtracted from the headline duration, because the interesting number
+         * is what the SUITE costs. The sign-out branch of a run needs a real
+         * Passport sign-in, so without this the tester's thinking time is
+         * charged to the suite - and that figure is what gets used to judge
+         * whether the pacing is too high.
+         */
+        private var interactiveMs:Number = 0;
+
         /** Set when a suite calls abortLiveSuites(); later live suites are skipped */
         private var liveAborted:Boolean = false;
+
+        /** Why the live run was abandoned, shown against every skipped case */
+        private var liveAbortReason:String = null;
 
         //==================== CONSTRUCTOR ====================
 
@@ -97,14 +114,25 @@ package ngiotest {
         }
 
         /**
-         * Abandon every live suite that has not started yet.
+         * Abandon the rest of the live run - every live suite that has not
+         * started, and every case left in the one that is running.
          *
-         * Used by the confirmation gate when the user declines (or ignores) the
-         * prompt to go online. Offline suites are unaffected, and suites already
-         * finished keep their results.
+         * Two callers, for opposite reasons. The confirmation gate uses it when
+         * the user declines to go online. LiveSuite uses it when the gateway
+         * stops answering, where stopping is the entire point: the limit counts
+         * requests per window, so continuing to fire at a gateway that has
+         * already refused us spends the next window's budget too.
+         *
+         * Offline suites are unaffected, and finished suites keep their results.
+         *
+         * @param reason Shown against each skipped case; defaults to the
+         *               declined-gate wording when omitted
          */
-        public function abortLiveSuites():void {
+        public function abortLiveSuites(reason:String = null):void {
             liveAborted = true;
+            liveAbortReason = (reason == null || reason.length == 0)
+                            ? "live testing was declined"
+                            : reason;
         }
 
         /**
@@ -151,7 +179,7 @@ package ngiotest {
             // A gate suite may have called off the rest of the live run
             if (activeSuite.isLive && liveAborted) {
                 Reporter.suite(activeSuite.suiteName);
-                Reporter.skip("<entire suite>", "live testing was declined");
+                Reporter.skip("<entire suite>", liveAbortReason);
                 skippedCount++;
                 activeSuite = null;
                 advanceSuite();
@@ -174,6 +202,7 @@ package ngiotest {
             }
 
             Reporter.suite(activeSuite.suiteName);
+            showSuiteBanner();
 
             // Say so when a suite runs at its own pace. Otherwise a run that
             // takes 14 seconds longer than the last one looks like the gateway
@@ -225,9 +254,11 @@ package ngiotest {
                 return;
             }
 
-            // Space out gateway traffic. Weak medicine - the limit counts
-            // connections per window, so pacing does not lower the count. See
-            // TestConfig.LIVE_TEST_PACING_MS before relying on it.
+            // Space out gateway traffic. This is what currently keeps a full run
+            // inside the allowance: the limit is a count per time window, so
+            // spreading the run across more seconds moves requests between
+            // windows. See TestConfig.LIVE_TEST_PACING_MS - it only works
+            // because it applies to the whole run.
             //
             // Returning here leaves pump()'s loop with nothing to do, so it exits
             // cleanly; the timer calls pump() again once the pause is served.
@@ -253,10 +284,24 @@ package ngiotest {
             var testCase:TestCase = activeSuite.cases[caseIndex] as TestCase;
             var self:TestRunner = this;
 
+            // Stop the suite that was RUNNING when the live run was called off.
+            // advanceSuite() only catches suites that have not started, so
+            // without this the remaining cases here would each fire another
+            // request at a gateway that has already refused us - which is what
+            // turns a short rate-limit cool-off into a long one. Skipped without
+            // constructing a context, so nothing can make a call.
+            if (activeSuite.isLive && liveAborted) {
+                Reporter.skip(testCase.name, liveAbortReason);
+                skippedCount++;
+                pump();
+                return;
+            }
+
             var context:TestContext = new TestContext(testCase.name, ui, function(finished:TestContext):void {
                 self.completeCase(finished);
             });
             activeContext = context;
+            caseStartedAt = new Date().time;
 
             var timeoutMs:int = (testCase.timeoutMs > 0) ? testCase.timeoutMs : TestConfig.TEST_TIMEOUT_MS;
             startTimeout(timeoutMs, context);
@@ -293,6 +338,15 @@ package ngiotest {
             stopTimeout();
             activeContext = null;
 
+            // Charged to the human, not to the suite. The whole case is counted
+            // rather than just the pause - there is no way to know when the
+            // reader actually looked at the screen, and a prompted test does
+            // almost nothing else anyway.
+            if (context.waitedForInput && caseStartedAt > 0) {
+                interactiveMs += (new Date().time - caseStartedAt);
+            }
+            caseStartedAt = 0;
+
             assertionCount += context.assertionCount;
 
             if (context.skipped) {
@@ -319,9 +373,39 @@ package ngiotest {
 
             if (ui != null) {
                 ui.hideButton();
+                // Put the banner back. Without this, whatever a prompt or a
+                // status() call left on screen stays there for the rest of the
+                // run - which is how the stage ended up describing something
+                // that had finished several suites ago.
+                showSuiteBanner();
             }
 
             pump();
+        }
+
+        //==================== ON-STAGE TEXT ====================
+
+        /**
+         * Name the suite in progress, and nothing else.
+         *
+         * The on-stage field deliberately does NOT track individual tests. It
+         * used to, and the result was a line that was almost always describing
+         * work that had already finished - a test completes in milliseconds,
+         * while a person reads at human speed. The Output panel is the report;
+         * this is a sign saying which part of the run you are in.
+         *
+         * So it changes exactly twice per suite: here, and when a test needs an
+         * answer from you.
+         */
+        private function showSuiteBanner():void {
+            if (ui == null || activeSuite == null) {
+                return;
+            }
+
+            ui.setInfo(
+                activeSuite.suiteName + "   (" + (suiteIndex + 1) + " of " + suites.length + ")" +
+                "\n\nRunning - results appear in the Output panel."
+            );
         }
 
         //==================== TIMEOUT WATCHDOG ====================
@@ -389,7 +473,7 @@ package ngiotest {
         //==================== COMPLETION ====================
 
         private function finishRun():void {
-            var elapsedSeconds:Number = Math.round((new Date().time - startedAt) / 100) / 10;
+            var totalMs:Number = new Date().time - startedAt;
 
             Reporter.blank();
             Reporter.header("Summary");
@@ -397,7 +481,21 @@ package ngiotest {
             Reporter.line("Failed:     " + failedCount);
             Reporter.line("Skipped:    " + skippedCount);
             Reporter.line("Assertions: " + assertionCount);
-            Reporter.line("Duration:   " + elapsedSeconds + "s");
+
+            // The headline figure is what the SUITE cost. Time spent waiting on
+            // a human is split out rather than folded in, because the total is
+            // what gets used to judge pacing and run cost - and a run that sat
+            // on the confirmation button for four minutes is not a slow suite.
+            var elapsedSeconds:Number = Math.round(totalMs / 100) / 10;
+
+            if (interactiveMs > 0) {
+                var suiteSeconds:Number = Math.round((totalMs - interactiveMs) / 100) / 10;
+                var waitSeconds:Number = Math.round(interactiveMs / 100) / 10;
+                Reporter.line("Duration:   " + suiteSeconds + "s running, plus " +
+                              waitSeconds + "s waiting for a human (" + elapsedSeconds + "s total)");
+            } else {
+                Reporter.line("Duration:   " + elapsedSeconds + "s");
+            }
 
             // Reported because the gateway limits X connections within Y minutes
             // and the suite is the only thing here that can measure its own draw

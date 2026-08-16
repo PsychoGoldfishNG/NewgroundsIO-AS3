@@ -91,12 +91,20 @@ package io.newgrounds.helpers {
 				}
 				core.reportNetworkActivity("error", "IOError - " + event.text);
 
-				// Report what the server actually said. Falls back to 500 only
-				// when no status was reported, since something did go wrong.
-				core.forwardHTTPResponse(
-					(httpStatus != HttpStatusHelper.UNKNOWN_STATUS) ? httpStatus : 500,
-					null, callback, thisArg
-				);
+				// Report what the server actually said, and UNKNOWN_STATUS when it
+				// said nothing.
+				//
+				// This used to fall back to 500, which names the SERVER as the
+				// thing that failed - "an unexpected error has occurred on the
+				// server, contact support". But no status means no reply reached
+				// us at all: offline, DNS, a blocked domain, a request that never
+				// left the machine. Telling the player to contact Newgrounds
+				// support because their wifi dropped is worse than saying nothing.
+				//
+				// UNKNOWN_STATUS maps to INVALID_RESPONSE (505) instead, which
+				// claims only what is actually known. Matches AS2, where LoadVars
+				// almost never exposes a status so this path is the common one.
+				core.forwardHTTPResponse(httpStatus, null, callback, thisArg);
 			});
 			
 			loader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, function(event:SecurityErrorEvent):void {
@@ -119,7 +127,12 @@ package io.newgrounds.helpers {
 					trace("NETWORK: Error sending request - " + e.message);
 				}
 				core.reportNetworkActivity("error", "Error sending request - " + e.message);
-				core.forwardHTTPResponse(500, null, callback, thisArg);
+
+				// load() threw, so the request never left the machine. Same
+				// reasoning as the IOError branch above: there is no server to
+				// blame for a failure that happened here, so report
+				// UNKNOWN_STATUS rather than a 500 nobody sent.
+				core.forwardHTTPResponse(HttpStatusHelper.UNKNOWN_STATUS, null, callback, thisArg);
 			}
 		}
 		
