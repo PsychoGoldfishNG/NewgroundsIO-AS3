@@ -532,8 +532,10 @@ observations, the same skip pattern. The libraries carry identical live coverage
 (91 registered cases in each), so the passed/skipped totals differ only by the
 offline count.
 
-**The two libraries cost the same to run.** AS3 spends **98.0s**, AS2 **100.6s**,
-on the same 90 live cases at the same 750ms pacing.
+**The two libraries cost the same to run.** Across all four measured runs — both
+libraries, both branches of the sign-out prompt — AS3 spends **98.0s** and AS2
+**99.8–100.6s** on the same 90 live cases at the same 750ms pacing. About two
+seconds apart, consistently.
 
 This file previously claimed AS3 was ~30s slower, and that was wrong — it was an
 artefact of the very gap that has since been closed. AS3 had no human-wait split,
