@@ -25,13 +25,30 @@
 		 * both properties required, but they are mutually exclusive - a plain "all present"
 		 * check can never pass. This enforces the actual rule instead.
 		 */
-		override public function hasValidProperties():Boolean {
-			if (!super.hasValidProperties()) {
-				return false;
+		override public function getPreflightError():io.newgrounds.models.objects.NgioError {
+			var parentError:io.newgrounds.models.objects.NgioError = super.getPreflightError();
+			if (parentError != null) {
+				return parentError;
 			}
 
 			var hasComponent:Boolean = (this.component != null && this.component.length > 0);
 			var hasSecure:Boolean = (this.secure != null && this.secure.length > 0);
 
-			return (hasComponent || hasSecure) && !(hasComponent && hasSecure);
+			if (!hasComponent && !hasSecure) {
+				return io.newgrounds.Errors.getError(
+					io.newgrounds.Errors.MISSING_PARAMETER,
+					"Execute requires either 'component' or 'secure', and has neither.",
+					false
+				) as io.newgrounds.models.objects.NgioError;
+			}
+
+			if (hasComponent && hasSecure) {
+				return io.newgrounds.Errors.getError(
+					io.newgrounds.Errors.INVALID_PARAMETER,
+					"Execute carries both 'component' and 'secure', which are mutually exclusive.",
+					false
+				) as io.newgrounds.models.objects.NgioError;
+			}
+
+			return null;
 		}

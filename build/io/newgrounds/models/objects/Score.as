@@ -19,7 +19,7 @@ package io.newgrounds.models.objects {
 		public var user:io.newgrounds.models.objects.User = null;
 		
 		/**
-		 * The integer value of the score.
+		 * The score value as a whole number, between -2147483648 and 2147483647. See formatted_value for the display form configured in your scoreboard settings.
 		 */
 		public var value:Number = 0;
 		

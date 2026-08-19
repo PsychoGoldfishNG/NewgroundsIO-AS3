@@ -222,7 +222,28 @@ package io.newgrounds.models.objects {
         
         /**
          * Posts a score to this scoreboard.
-         * @param value The score value to post
+         *
+         * THE SERVER STORES A 32-BIT INTEGER, and reshapes anything else
+         * SILENTLY rather than rejecting it:
+         *
+         *   - fractional values are truncated toward zero (1.9 posts as 1,
+         *     and -1.9 posts as -1 - it truncates, it does not round or floor)
+         *   - values outside -2147483648..2147483647 are clamped to the
+         *     nearest limit
+         *
+         * Either way the post SUCCEEDS and the result carries the adjusted
+         * value, so nothing surfaces as an error. A game scoring in
+         * milliseconds or accumulating a large total can pass that ceiling and
+         * find every subsequent score identical.
+         *
+         * This library deliberately does NOT round or range-check on the
+         * caller's behalf. The server is the authority on what it stores, and a
+         * port inventing its own limits would disagree with the other ports and
+         * with scores those games have already posted. Read `value` back off
+         * the result if the exact stored number matters.
+         *
+         * @param value The score value to post. Round and range-check
+         *              calculated values before calling - see above
          * @param tag Optional tag to associate with the score
          * @param callback Function to call when posting is complete
          * @param thisArg Context to use when calling the callback

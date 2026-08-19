@@ -6,8 +6,11 @@
          *                 where error is null on success. Read the updated point total from
          *                 NGIO.getMedalScore() - AppState updates it from the same result.
          * @param thisArg Context to use when calling the callback
+         * @throws ArgumentError if this medal was loaded from another app
          */
         public function unlock(callback:Function = null, thisArg:* = null):void {
+            this.assertNotForeign("unlock()", "The gateway would reject this medal id against this app.");
+
             var callbackParams:Object = {
                 callback: callback,
                 thisArg: thisArg

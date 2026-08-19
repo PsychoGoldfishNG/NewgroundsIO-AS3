@@ -3,7 +3,7 @@
  * unlock
  * 
  * Component: Medal.unlock
- * Unlocks a medal.
+ * Unlocks a medal. Requires a session with a signed-in user attached; a session without one fails with a Login Required error.
  */
 package io.newgrounds.models.components.Medal {
 	
@@ -27,6 +27,7 @@ package io.newgrounds.models.components.Medal {
 			// Set component-specific flags
 			this.isSecure = true;
 			this.requiresSession = true;
+			this.requiresLogin = true;
 			this.redirect = false;
 		}
 		

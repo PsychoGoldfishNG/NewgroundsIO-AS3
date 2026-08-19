@@ -276,6 +276,78 @@ package ngiotest.suites {
                 t.done();
             });
 
+            add("import stamps a child's position, and getFullObjectName() stays flat", function(t:TestContext):void {
+                // parent and parentPropertyName used to be dead - declared,
+                // documented, and never assigned by anything in either library.
+                // importFromObject now stamps them via stampChildPosition() as it
+                // casts each nested value.
+                //
+                // The pair feeds getObjectPath(), NOT getFullObjectName(). That
+                // split is load-bearing and this test exists to keep it:
+                // importFromObject uses getFullObjectName() as a TYPE CHECK when it
+                // imports a nested value into a standalone one -
+                // AppStateResultUpdateHelper lifts result.session into
+                // appState.session that way. Make the name positional and that check
+                // compares "object.Session" against "object.checkSessionResult.session"
+                // and session handling breaks.
+                var session:Session = new Session();
+                session.importFromObject({
+                    id: "abc",
+                    user: { id: 1, name: "Nested" }
+                });
+
+                if (!t.assertNotNull(session.user, "nested user imported")) {
+                    t.done();
+                    return;
+                }
+
+                t.assertStrictEquals(session, session.user.parent, "import set parent to the containing model");
+                t.assertEquals("user", session.user.parentPropertyName, "import recorded the property it arrived on");
+
+                // Type identity - unchanged by nesting, and deliberately so.
+                t.assertEquals("object.User", session.user.getFullObjectName(),
+                    "getFullObjectName() still answers WHAT it is, not where it sits");
+
+                // Position - the hierarchical name lives here instead.
+                t.assertEquals("object.Session.user", session.user.getObjectPath(),
+                    "getObjectPath() answers WHERE it sits");
+                t.assertEquals("object.Session", session.getObjectPath(),
+                    "an unparented model's path is just its own type name");
+                t.done();
+            });
+
+            add("array elements are stamped with their index", function(t:TestContext):void {
+                var result:Object = ObjectFactory.CreateResult("Medal", "getList", {
+                    success: true,
+                    medals: [
+                        { id: 1, name: "First" },
+                        { id: 2, name: "Second" }
+                    ]
+                });
+
+                if (!t.assertNotNull(result, "getListResult created")) {
+                    t.done();
+                    return;
+                }
+
+                var medals:Array = result["medals"];
+
+                if (!t.assert(medals != null && medals.length == 2, "both medals imported")) {
+                    t.done();
+                    return;
+                }
+
+                t.assertStrictEquals(result, medals[0].parent, "element 0 points at the containing result");
+                t.assertEquals("medals[0]", medals[0].parentPropertyName, "element 0 records its index");
+                t.assertEquals("medals[1]", medals[1].parentPropertyName, "element 1 records its index");
+
+                t.assertEquals("object.Medal", medals[1].getFullObjectName(),
+                    "type identity is unaffected by living in an array");
+                t.assertEquals("result.Medal.getList.medals[1]", medals[1].getObjectPath(),
+                    "the path names the slot the medal arrived in");
+                t.done();
+            });
+
             add("validates required properties", function(t:TestContext):void {
                 // Event.logEvent requires host + event_name, both Strings that
                 // default to null, so a fresh instance must be invalid.

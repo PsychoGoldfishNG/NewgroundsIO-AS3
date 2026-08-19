@@ -32,6 +32,7 @@ package io.newgrounds.models.components.Event {
 			// Set component-specific flags
 			this.isSecure = false;
 			this.requiresSession = false;
+			this.requiresLogin = false;
 			this.redirect = false;
 		}
 		

@@ -3,7 +3,7 @@
  * setData
  * 
  * Component: CloudSave.setData
- * Saves data to a save slot. Any existing data will be replaced.
+ * Saves data to a save slot. Any existing data will be replaced. Requires a session with a signed-in user attached; a session without one fails with a Login Required error.
  */
 package io.newgrounds.models.components.CloudSave {
 	
@@ -32,6 +32,7 @@ package io.newgrounds.models.components.CloudSave {
 			// Set component-specific flags
 			this.isSecure = false;
 			this.requiresSession = true;
+			this.requiresLogin = true;
 			this.redirect = false;
 		}
 		

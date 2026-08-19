@@ -28,6 +28,7 @@ package io.newgrounds {
 	
 	import io.newgrounds.models.objects.Session;
 	import io.newgrounds.models.objects.ObjectFactory;
+	import io.newgrounds.helpers.ComponentValidationHelper;
 	import io.newgrounds.helpers.CoreComponentCallHelper;
 	import io.newgrounds.helpers.CoreQueueExecutionHelper;
 	import io.newgrounds.helpers.HttpRequestHelper;
@@ -261,6 +262,7 @@ package io.newgrounds {
 			var partitionedQueue:Object = CoreQueueExecutionHelper.partitionExecuteQueue(componentQueue, this);
 			var redirectComponents:Array = partitionedQueue.redirectComponents;
 			var toExecute:Array = partitionedQueue.batchedExecuteWrappers;
+			var refusedComponents:Array = partitionedQueue.refusedComponents;
 			
 			// Dispatch redirects WITHOUT the caller's callback.
 			//
@@ -282,15 +284,40 @@ package io.newgrounds {
 			
 			// Queue has been processed - clear it for next batch
 			componentQueue = [];
-			
+
 			// If we ended up with no components to send, we're done
 			if (toExecute.length == 0) {
+				// Unless everything in the queue was refused locally, in which
+				// case the caller is owed a report saying so. Answering null
+				// here would mean "nothing to do", which is the one thing that
+				// did not happen.
+				if (refusedComponents != null && refusedComponents.length > 0) {
+					if (callback != null) {
+						callback.call(thisArg, ComponentValidationHelper.buildRefusalResponseList(refusedComponents, this));
+					}
+					return;
+				}
+
 				if (callback != null) {
 					callback.call(thisArg, null);
 				}
 				return;
 			}
-			
+
+			// Some components were refused but others are going out. Send the
+			// valid ones, then fold the refusals into the response so the
+			// caller gets ONE report covering everything it queued - which is
+			// how the gateway would have answered had it done the refusing.
+			if (refusedComponents != null && refusedComponents.length > 0) {
+				var core:Core = this;
+				sendRequest(toExecute, false, function(response:io.newgrounds.models.objects.Response):void {
+					if (callback != null) {
+						callback.call(thisArg, CoreQueueExecutionHelper.mergeRefusalsIntoResponse(response, refusedComponents, core));
+					}
+				}, null);
+				return;
+			}
+
 			// Send all the components to the server
 			sendRequest(toExecute, false, callback, thisArg);
 		}
@@ -307,14 +334,39 @@ package io.newgrounds {
 			if (componentModel != null && componentModel.core == null) {
 				componentModel.core = this;
 			}
-			
+
+			// Get redirect flag from the component
+			var isRedirect:Boolean = componentModel.redirect;
+
+			// Refuse a component that cannot possibly succeed, without spending
+			// a request on it. The refusal is shaped exactly like the server's,
+			// so callers need no special case - see ComponentValidationHelper.
+			//
+			// Redirects are exempt: they navigate the browser rather than
+			// exchanging JSON, there is no response to shape, and the one that
+			// matters (App.startSession -> Passport) is how a session gets
+			// established in the first place.
+			if (!isRedirect) {
+				var validationError:io.newgrounds.models.objects.NgioError = componentModel.getPreflightError();
+
+				if (validationError != null) {
+					if (debugNetworkCalls) {
+						trace("NETWORK: refused locally - " + validationError.message);
+					}
+					reportNetworkActivity("error", "Refused before sending - " + validationError.message);
+
+					if (callback != null) {
+						callback.call(thisArg, ComponentValidationHelper.buildRefusalResponse(componentModel, validationError, this));
+					}
+					return;
+				}
+			}
+
 			// Wrap the component for transmission
 			var executeModel:io.newgrounds.models.objects.Execute = ObjectFactory.CreateObject("Execute", null, this) as io.newgrounds.models.objects.Execute;
 			executeModel.core = this;
 			executeModel.setComponent(componentModel);
-			
-			// Get redirect flag from the component
-			var isRedirect:Boolean = componentModel.redirect;
+
 			// Send it with the redirect flag from the component
 			sendRequest(executeModel, isRedirect, callback, thisArg);
 		}

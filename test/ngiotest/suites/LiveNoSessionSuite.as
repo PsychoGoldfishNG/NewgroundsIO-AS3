@@ -157,7 +157,7 @@ package ngiotest.suites {
 
             //==================== THE SESSION-GATED HALF ====================
 
-            add("an unlock with no session is refused, and by the SERVER", function(t:TestContext):void {
+            add("an unlock with no session is refused BEFORE it is sent", function(t:TestContext):void {
                 if (self.skipUnlessSessionFree(t)) {
                     return;
                 }
@@ -168,22 +168,27 @@ package ngiotest.suites {
                     return;
                 }
 
-                // WORTH KNOWING, and the reason this test says "by the SERVER":
-                // BaseComponent.hasValidProperties() checks requiresSession and
-                // would reject this before it left the machine - but NOTHING IN
-                // build/ EVER CALLS IT. Confirmed by grep: the only callers are
-                // in the offline tests. Every session guard in this library is
-                // server-side at runtime, so the request goes out and comes back
-                // refused.
+                // THIS TEST CHANGED SIDES, and the history is worth keeping.
                 //
-                // That also means the offline test "a session-gated component is
-                // invalid without a session" pins a method the library never
-                // consults. Both are worth having; neither should be mistaken
-                // for the other.
+                // It used to be named "and by the SERVER", because
+                // BaseComponent.hasValidProperties() checked requiresSession and
+                // NOTHING IN build/ EVER CALLED IT - so the request went out,
+                // over the network, to be refused by the gateway.
+                //
+                // Core now consults it (as getPreflightError()) before sending,
+                // so with no session id this never leaves the machine. The
+                // ASSERTIONS below are unchanged and still pass, because the
+                // local refusal is deliberately shaped like the server's and
+                // carries the same code. That is the contract being pinned here:
+                // the caller cannot tell the difference.
+                //
+                // Note the request count for a full run drops accordingly. If
+                // this test ever starts costing a request again, something has
+                // stopped consulting the preflight check.
                 var medal:Medal = medals[0] as Medal;
                 medal.unlock(function(unlockedMedal:Medal, error:*):void {
                     if (t.assertNotNull(error, "the unlock was refused")) {
-                        t.note("server said: " + self.describeError(error));
+                        t.note("refused with: " + self.describeError(error));
                     }
                     t.assertFalse(unlockedMedal.unlocked, "and the medal is not flagged unlocked");
                     t.assertFalse(NGIO.hasSession(), "a refused call did not open a session either");
@@ -196,15 +201,20 @@ package ngiotest.suites {
                     return;
                 }
 
-                // Same shape as the unlock above: sent, then refused
-                // server-side.
+                // Same shape as the unlock above: refused before sending.
                 //
-                // THE CODE IS THE POINT. With no session the gateway answers
-                // 102, "Missing required parameter" - there is no session_id in
-                // the envelope to check. With a guest session it answers 110,
-                // "User is not logged in" - the id is there and belongs to
-                // nobody. Same call, same component, two genuinely different
-                // refusals.
+                // THE CODE IS THE POINT, and it is why the local refusal can
+                // stand in for the server's here. With no session the gateway
+                // answers 102, "Missing required parameter" - there is no
+                // session_id in the envelope to check, which is a judgement the
+                // client can make for itself. With a guest session it answers
+                // 110, "User is not logged in" - the id is there and belongs to
+                // nobody, which is a judgement only the SERVER can make. Same
+                // call, same component, two genuinely different refusals, and
+                // only one of them is knowable locally.
+                //
+                // That asymmetry is exactly why the preflight check stops at the
+                // session id: see BaseComponent.getPreflightError().
                 //
                 // That is the empirical case for LiveNoSessionSuite and
                 // LiveGuestSuite being separate suites rather than one: they are

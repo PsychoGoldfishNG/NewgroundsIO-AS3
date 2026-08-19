@@ -22,6 +22,7 @@ package io.newgrounds.models.components.Gateway {
 			// Set component-specific flags
 			this.isSecure = false;
 			this.requiresSession = false;
+			this.requiresLogin = false;
 			this.redirect = false;
 		}
 		
