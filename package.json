@@ -6,7 +6,6 @@
     "build": "npx ngio-build ./src/modelgen/config.js"
   },
   "dependencies": {
-    "@psychogoldfish/ngio-object-model-generator": "github:PsychoGoldfishNG/ngio-object-model-generator",
-    "adm-zip": "^0.5.16"
+    "@psychogoldfish/ngio-object-model-generator": "github:PsychoGoldfishNG/ngio-object-model-generator"
   }
 }
