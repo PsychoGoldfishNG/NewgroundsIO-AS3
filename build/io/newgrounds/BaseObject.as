@@ -218,15 +218,32 @@ package io.newgrounds {
 			var castTypesObj:Object = castTypes;
 
 			// make an empty version of this object to reference default values for properties that aren't provided in the import
-			var defaultObject = io.newgrounds.models.objects.ObjectFactory.CreateObject(objectName, null, core);
+			var defaultObject:BaseObject = buildDefaultInstance();
 
 			for (var i:int = 0; i < propNames.length; i++) {
 				var propertyName:String = propNames[i] as String;
 				
 				// Check if property exists in the import object
 				if (!(propertyName in importObject)) {
-					// Property not provided in import - keep default value
-					if (defaultObject != null) {
+					if (objectType == "component") {
+						// A component is built from a developer-supplied PARTIAL parameter
+						// set (see ObjectFactory.CreateComponent), not a complete snapshot.
+						// Absent means "not sent" - null it explicitly so it drops out of
+						// toObject()'s excludeNulls pass instead of reappearing on the wire
+						// as its type's zero value.
+						//
+						// NOTE for String/Object-typed properties this works as intended.
+						// For a strictly-typed Boolean/int/uint/Number property, ActionScript
+						// 3 coerces an assigned null back to that type's own default
+						// (false/0/NaN) rather than storing null - so this is a no-op for
+						// those two properties in the current schema (ScoreBoard.getScores.social,
+						// App.startSession.force), which still serialize with their zero value.
+						// Achieving a genuine drop for those would need a nullable/boxed
+						// property type, which is a larger change than this fix. AS2 and
+						// TypeScript (loosely-typed at this boundary) do not have this
+						// limitation - see their BaseObject implementations.
+						this[propertyName] = null;
+					} else if (defaultObject != null) {
 						this[propertyName] = defaultObject[propertyName];
 					}
 					// else: keep whatever the class-level initializer set
@@ -256,6 +273,45 @@ package io.newgrounds {
                 // it - stamp it here or a failed nested model reports no path.
                 stampChildPosition(this.error, "error");
             }
+		}
+
+		/**
+		 * A throwaway instance used to read this model's declared defaults.
+		 *
+		 * A result's objectName is a dotted component path ("Medal.unlock") that
+		 * ObjectFactory.CreateObject() cannot resolve by objectName alone - see
+		 * BaseObject.md, "The default instance and dotted names". Dispatching to
+		 * CreateResult for objectType == "result" lets it split the scope and method
+		 * apart, so declared defaults apply there too.
+		 *
+		 * Deliberately NOT extended to objectType == "component": a component is
+		 * built from a developer-supplied PARTIAL parameter set (see
+		 * ObjectFactory.CreateComponent), not a complete server snapshot, so the
+		 * "absent means reset to the declared default" reasoning does not apply -
+		 * an omitted optional parameter needs to stay absent so it drops off the
+		 * wire in toObject(), not reappear as its type's default value. Return null
+		 * for components and let the caller's "keep the constructor value" fallback
+		 * handle it, same as it always effectively has.
+		 *
+		 * @return A fresh instance of this same type, or null if it couldn't be built
+		 */
+		private function buildDefaultInstance():BaseObject {
+			var instance:BaseObject = null;
+			try {
+				if (objectType == "object") {
+					instance = ObjectFactory.CreateObject(objectName, null, core);
+				} else if (objectType == "result") {
+					var dotIndex:int = objectName.indexOf(".");
+					if (dotIndex != -1) {
+						var scope:String = objectName.substring(0, dotIndex);
+						var method:String = objectName.substring(dotIndex + 1);
+						instance = ObjectFactory.CreateResult(scope, method, null, core);
+					}
+				}
+			} catch (e:Error) {
+				instance = null;
+			}
+			return instance;
 		}
 
 		/**

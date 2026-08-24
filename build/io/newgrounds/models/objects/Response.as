@@ -29,11 +29,6 @@ package io.newgrounds.models.objects {
 		public var debug:io.newgrounds.models.objects.Debug = null;
 		
 		/**
-		 * This will be a #Result object, or an array containing one-or-more #Result objects (this will match the structure of the execute property in your #Request object).
-		 */
-		public var result:* = null;
-		
-		/**
 		 * If there was an error, this will contain the current version number of the API gateway.
 		 */
 		public var api_version:String = null;
@@ -43,6 +38,16 @@ package io.newgrounds.models.objects {
 		 */
 		public var echo:* = null;
 		
+		/**
+		 * This will be a #Result object, or an array containing one-or-more #Result objects
+		 * (this will match the structure of the execute property in your #Request object).
+		 *
+		 * Excluded from the schema-driven propertyNames loop (see object.ejs) because
+		 * this is Model-Generation.md's Mixed Type Handling pattern - use
+		 * setResult()/setResultList()/resultIsList() rather than assigning directly.
+		 */
+		public var result:* = null;
+
 		/**
 		 * Array of Result objects (for mixed type handling with single result)
 		 */
@@ -74,7 +79,7 @@ package io.newgrounds.models.objects {
 		 * All property names for this object
 		 */
 		override public function get propertyNames():Array {
-			return ["app_id","success","debug","result","api_version","echo"];
+			return ["app_id","success","debug","api_version","echo"];
 		}
 		
 		/**
@@ -89,8 +94,7 @@ package io.newgrounds.models.objects {
 		 */
 		override public function get castTypes():Object {
 			return {
-				"debug": "Debug",
-				"result": "array-of-Result"
+				"debug": "Debug"
 			};
 		}
 		

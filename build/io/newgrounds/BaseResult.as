@@ -54,10 +54,10 @@ package io.newgrounds {
         */
         override public function importFromObject(importObject:*):void {
             super.importFromObject(importObject);
-            // Import success property if it exists
-            if (importObject.hasOwnProperty("success")) {
-                this.success = importObject.success as Boolean;
-            }
+            // Import success property if it exists, otherwise reset to false.
+            // importFromObject is a full replace, not a patch (see BaseObject.md) -
+            // an absent property must not leave a stale value from a prior import.
+            this.success = (importObject.hasOwnProperty("success")) ? importObject.success as Boolean : false;
         }
 
 		//==================== USAGE PATTERN ====================

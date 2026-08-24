@@ -29,7 +29,25 @@
 // COMMENT: Prepare data structures we'll need while generating this class
 // NOTE: Filter out 'error' property because it's now inherited from BaseObject
 // All BaseObject subclasses (objects, components, results) have error defined at the base level
-const propertyNames = Object.keys(model.properties).filter(prop => prop !== 'error');
+//
+// NOTE: Also filter out "mixed single-or-array" properties (property.object and
+// property.array.object both set to the same type) - Model-Generation.md's Mixed Type
+// Handling pattern. These need a custom {prop}/{prop}List pair with setters that clear
+// each other, not the generic array-of-X cast (which always normalizes to an array,
+// collapsing the single/list distinction the pattern exists to preserve). In the current
+// schema this is Request.execute and Response.result, both handled entirely by their own
+// partials/custom toObject() overrides - emitting them here produces stale
+// propertyNames/requiredProperties/castTypes entries that fight the hand-written accessors.
+// The `object !== 'Result'` filter is a backstop for any future bare (non-array) Result
+// reference, since Result is never registered in ObjectFactory (see "Result Model" in
+// Model-Generation.md).
+function isMixedSingleOrArray(property) {
+	return Boolean(property.object) && Boolean(property.array) && property.array.object === property.object;
+}
+const propertyNames = Object.keys(model.properties)
+	.filter(prop => prop !== 'error')
+	.filter(prop => !isMixedSingleOrArray(model.properties[prop]))
+	.filter(prop => model.properties[prop].object !== 'Result');
 const requiredParams = [];
 const hasProperties = propertyNames.length > 0;
 const className = helpers.getClassName(model.name);
