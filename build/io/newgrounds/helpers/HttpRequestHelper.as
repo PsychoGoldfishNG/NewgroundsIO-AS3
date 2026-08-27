@@ -39,7 +39,7 @@ package io.newgrounds.helpers {
 		}
 		
 		private static function serializeExecuteValue(requestModel:Request):* {
-			if (requestModel.executeIsArray()) {
+			if (requestModel.executeIsList()) {
 				var executeArray:Array = [];
 				for each (var item:* in requestModel.getExecuteList()) {
 					executeArray.push(serializeExecuteItem(item));

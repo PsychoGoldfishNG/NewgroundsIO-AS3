@@ -38,7 +38,7 @@ package io.newgrounds.models.objects {
 		 *
 		 * Excluded from the schema-driven propertyNames loop (see object.ejs) because
 		 * this is Model-Generation.md's Mixed Type Handling pattern - use
-		 * setExecute()/setExecuteList()/executeIsArray() rather than assigning directly.
+		 * setExecute()/setExecuteList()/executeIsList() rather than assigning directly.
 		 */
 		public var execute:* = null;
 
@@ -113,11 +113,11 @@ package io.newgrounds.models.objects {
 		}
 		
 		/**
-		 * Checks if execute is in array format
-		 * 
+		 * Checks if execute is in list format
+		 *
 		 * @return true if using list format, false if using single value
 		 */
-		public function executeIsArray():Boolean {
+		public function executeIsList():Boolean {
 			return this.executeList != null && this.executeList.length > 0;
 		}
 		
