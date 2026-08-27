@@ -99,6 +99,11 @@ package io.newgrounds {
 		/**
 		 * Flag set to true if app version is outdated
 		 * Developers can check this flag to prompt users to update
+		 *
+		 * Only meaningful once your Newgrounds project has a version set in
+		 * "Version Control" AND core.buildVersion is set. With no project version
+		 * configured, leave core.buildVersion null or this can come back true for
+		 * a deprecation that isn't real.
 		 */
 		public var clientDeprecated:Boolean = false;
 		

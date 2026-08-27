@@ -108,7 +108,9 @@ package {
 		 * 
 		 * @param appId Your app's unique identifier from Newgrounds
 		 * @param encryptionKey The encryption key from Newgrounds
-		 * @param buildVersion Your app's version number in XX.XX.XXXX format (optional)
+		 * @param buildVersion Your app's version number in XX.XX.XXXX format (optional).
+		 *        Leave null unless a version is set in your Newgrounds project's "Version
+		 *        Control" settings, or App.getCurrentVersion can report a false deprecation.
 		 * @param useDebugMode If true, API calls won't actually save to the server (optional)
 		 */
 		public static function init(appId:String, encryptionKey:String, buildVersion:String = null, useDebugMode:Boolean = false):void 
