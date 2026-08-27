@@ -111,21 +111,6 @@ package io.newgrounds {
         /** Unique object ID assigned during construction (for debugging) */
         public var objectId:Number = -1;
 
-        //==================== ABSTRACT METHODS ====================
-        
-        /**
-	 * Helper method to get a class by its name
-	 * Override this in subclasses if you need custom class resolution
-	 * 
-	 * @param className The name of the class to resolve
-	 * @return The Class object, or null if not found
-	 */
-	protected function getClassByName(className:String):Class {
-		// This is a placeholder - subclasses or a factory should implement proper class resolution
-		// For now, return null and expect subclasses to override castToExpectedType for complex types
-		return null;
-	}
-
         /**
          * True if this object's data was loaded from another app.
          *
