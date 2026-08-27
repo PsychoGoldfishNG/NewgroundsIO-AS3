@@ -109,19 +109,23 @@ package io.newgrounds {
 		
 		/**
 		 * The logged-in user (if status = LOGGED_IN), otherwise null
-		 * 
-		 * Provides user info when needed
-		 * Contents when set: { id, name, supporter, url }
+		 *
+		 * Provides user info when needed.
+		 * When set: an io.newgrounds.models.objects.User model instance - the same one
+		 * attached to the session, copied by reference. NOT a plain object built here.
+		 * Readable fields: id, name, supporter, url
 		 * When null: In all other statuses (not logged in, error, etc.)
 		 */
 		public var user:* = null;
-		
+
 		/**
 		 * Error details (if status = ERROR), otherwise null
-		 * 
-		 * Helps developer understand what went wrong
-		 * Contents when set: { code, message }
-		 * Code values match io.newgrounds.Errors constants
+		 *
+		 * Helps developer understand what went wrong.
+		 * When set: an io.newgrounds.models.objects.Error model instance - the one on the
+		 * server response, or one from io.newgrounds.Errors.getError() when the client
+		 * raises the fault. NOT a bare string or an object literal.
+		 * Readable fields: code (an io.newgrounds.Errors constant), message
 		 * When null: In success states (LOGGED_IN) and transient states
 		 */
 		public var error:* = null;
