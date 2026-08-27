@@ -13,7 +13,16 @@
  * RELATIONSHIP: SessionStatus is a SNAPSHOT of the session at one moment in time.
  * It doesn't track changes - it's just what the status WAS when you called checkSession().
  * The actual session data is in NGIO.appState.session (a Session object).
- * 
+ *
+ * WRAPPER CONTEXT: NGIO.checkSession() is itself a convenience layer over the API's
+ * session machinery. There is no single gateway call that reports session state - it is
+ * driven by the App.startSession and App.checkSession components together with local flags
+ * the client tracks (passport window open, session verified by server). checkSession() runs
+ * whichever of those applies, creates or discards sessions as the server's responses
+ * dictate, throttles repeat polls, and collapses every outcome into one of this class's
+ * status constants. An app that only calls NGIO.checkSession() never touches those
+ * components or reads a raw gateway response.
+ *
  * NOTE: This is a simple data model that does NOT extend BaseObject
  */
 package io.newgrounds {
