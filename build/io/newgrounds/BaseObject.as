@@ -551,7 +551,12 @@ package io.newgrounds {
 		/**
 		 * Get a list of all validation errors
 		 * Provides detailed error information instead of just true/false
-		 * 
+		 *
+		 * Returns plain strings, not NgioError models, on purpose: every entry is the
+		 * same MISSING_PARAMETER condition, so a typed model per entry adds nothing to
+		 * branch on. This is a developer-facing report; callers needing one branchable
+		 * typed error use getPreflightError().
+		 *
 		 * @return Array of error message strings (empty array if no errors)
 		 */
 		public function getValidationErrors():Array {
