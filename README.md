@@ -254,6 +254,8 @@ Alternatively, you can:
 
 These components can be edited and customized to better fit your project.
 
+> **Load order:** Every other component depends on the Connector Component. Make sure your movie is fully loaded and the Connector Component has finished setting up before any other component appears on your timeline. A component that shows up before the connector exists will throw an error and won't finish setting itself up.
+
 > **Note on same-frame access:** Components register themselves with `NGIO`'s static references (`NGIO.connectorComponent`, `NGIO.scoreboardComponent`, etc.) after they are constructed. If your timeline code runs on the same frame the component first appears, the static reference may not be populated yet depending on layer ordering. To sidestep this, you can give a component an **instance name** in the Properties panel and use that name directly in your code instead of the static reference.
 
 ### The Connector Component ###
@@ -307,6 +309,8 @@ Replace existing code, and add any new UI elements you may need.
 This component unlocks medals on the server, and displays the visual popup message.
 
 It should be placed on a top level layer in your root timeline that covers any keyframes that a medal unlock could occur.
+
+The popup needs a frame to set itself up before it can be used. If it starts on frame 2, don't unlock medals until frame 3 or later. Unlocking a medal on the same frame the popup first appears can make the unlock animation silently fail to play.
 
 If you use multiple scenes, add this to each scene where medals can be unlocked.
 
