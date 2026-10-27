@@ -55,8 +55,11 @@ package io.newgrounds.helpers {
 		
 		/**
 		 * Sends a request through URLLoader and forwards completion/error events to Core.
+		 *
+		 * @param sentSessionId The session id the request went out with, handed back to
+		 *        Core with the response so a late session result can be recognized.
 		 */
-		public static function sendHttpRequest(core:Core, requestString:String, callback:Function = null, thisArg:* = null):void {
+		public static function sendHttpRequest(core:Core, requestString:String, callback:Function = null, thisArg:* = null, sentSessionId:* = undefined):void {
 			Security.allowDomain("www.newgrounds.io", ".newgrounds.io", "*");
 			
 			var request:URLRequest = new URLRequest(Core.GATEWAY_URL);
@@ -82,7 +85,7 @@ package io.newgrounds.helpers {
 					trace("         Response Data: " + loader.data);
 				}
 				core.reportNetworkActivity("response", loader.data as String);
-				core.forwardHTTPResponse(200, loader.data as String, callback, thisArg);
+				core.forwardHTTPResponse(200, loader.data as String, callback, thisArg, sentSessionId);
 			});
 			
 			loader.addEventListener(IOErrorEvent.IO_ERROR, function(event:IOErrorEvent):void {
@@ -104,7 +107,7 @@ package io.newgrounds.helpers {
 				// UNKNOWN_STATUS maps to INVALID_RESPONSE (505) instead, which
 				// claims only what is actually known. Matches AS2, where LoadVars
 				// almost never exposes a status so this path is the common one.
-				core.forwardHTTPResponse(httpStatus, null, callback, thisArg);
+				core.forwardHTTPResponse(httpStatus, null, callback, thisArg, sentSessionId);
 			});
 			
 			loader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, function(event:SecurityErrorEvent):void {
@@ -112,7 +115,7 @@ package io.newgrounds.helpers {
 					trace("NETWORK: SecurityError occurred - " + event.text);
 				}
 				core.reportNetworkActivity("error", "SecurityError - " + event.text);
-				core.forwardHTTPResponse(403, null, callback, thisArg);
+				core.forwardHTTPResponse(403, null, callback, thisArg, sentSessionId);
 			});
 			
 			try {
@@ -132,7 +135,7 @@ package io.newgrounds.helpers {
 				// reasoning as the IOError branch above: there is no server to
 				// blame for a failure that happened here, so report
 				// UNKNOWN_STATUS rather than a 500 nobody sent.
-				core.forwardHTTPResponse(HttpStatusHelper.UNKNOWN_STATUS, null, callback, thisArg);
+				core.forwardHTTPResponse(HttpStatusHelper.UNKNOWN_STATUS, null, callback, thisArg, sentSessionId);
 			}
 		}
 		

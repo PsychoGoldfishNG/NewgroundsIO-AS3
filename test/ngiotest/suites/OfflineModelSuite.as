@@ -14,6 +14,7 @@ package ngiotest.suites {
     import io.newgrounds.SessionStatus;
     import io.newgrounds.models.objects.Medal;
     import io.newgrounds.models.objects.NgioError;
+    import io.newgrounds.models.objects.ObjectFactory;
     import io.newgrounds.models.objects.SaveSlot;
     import io.newgrounds.models.objects.Score;
     import io.newgrounds.models.objects.ScoreBoard;
@@ -298,6 +299,23 @@ package ngiotest.suites {
                 var loggedIn:SessionStatus = state.getSessionStatus();
                 t.assertEquals(SessionStatus.LOGGED_IN, loggedIn.status, "user attached");
                 t.assertNotNull(loggedIn.user, "status carries the user");
+                t.done();
+            });
+
+            add("AppState flags a session result sent for a different session", function(t:TestContext):void {
+                var state:AppState = freshAppState();
+                var check:* = ObjectFactory.CreateResult("App", "checkSession", {}, null);
+                var start:* = ObjectFactory.CreateResult("App", "startSession", {}, null);
+                var medals:* = ObjectFactory.CreateResult("Medal", "getList", {}, null);
+
+                state.session.id = "sess-B";
+                t.assertTrue(state.isStaleSessionResult(check, "sess-A"), "check sent for an older session");
+                t.assertTrue(state.isStaleSessionResult(start, null), "start sent before a session existed");
+                t.assertFalse(state.isStaleSessionResult(check, "sess-B"), "check sent for the current session");
+                t.assertFalse(state.isStaleSessionResult(medals, "sess-A"), "non-session results are never flagged");
+
+                state.session.id = "";
+                t.assertFalse(state.isStaleSessionResult(start, null), "an empty id counts as no id");
                 t.done();
             });
 

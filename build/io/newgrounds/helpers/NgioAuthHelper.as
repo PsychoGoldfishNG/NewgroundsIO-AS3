@@ -18,6 +18,12 @@ package io.newgrounds.helpers {
 		
 		private static const CHECKSESSION_THROTTLE_TIME:Number = 3;
 		private static var lastCheckSessionTime:Date = null;
+
+		// True while an App.startSession is out. A second start would replace the first
+		// session, and Passport may already be open on it, so checkSession() answers
+		// locally until this one comes back. The throttle alone can't prevent that: a
+		// start slower than the throttle window lets the next poll through.
+		private static var sessionStartPending:Boolean = false;
 		
 		/**
 		 * Opens the Newgrounds login window so the user can authenticate.
@@ -85,21 +91,18 @@ package io.newgrounds.helpers {
 				return;
 			}
 						
+			var throttled:Boolean = false;
 			if (lastCheckSessionTime !== null) {
 				var timeSinceLastCheck:Number = (new Date().time - lastCheckSessionTime.time) / 1000;
-				if (timeSinceLastCheck < CHECKSESSION_THROTTLE_TIME) {
-					if (core.appState.passportIsOpen === true) {
-						sessionStatus.status = SessionStatus.WAITING_FOR_PASSPORT;
-					} else if (core.appState.session.verified !== true) {
-						sessionStatus.status = SessionStatus.UNVERIFIED;
-					} else {
-						sessionStatus.status = SessionStatus.NOT_LOGGED_IN;
-					}
-					callCallback(sessionStatus);
-					return;
-				}
+				throttled = (timeSinceLastCheck < CHECKSESSION_THROTTLE_TIME);
 			}
-			
+
+			if (sessionStartPending || throttled) {
+				reportLocalSessionStatus(core, sessionStatus, callCallback);
+				return;
+			}
+
+			// The throttle limits how often the server is polled.
 			lastCheckSessionTime = new Date();
 			
 			if (!hasSession(core)) {
@@ -111,9 +114,21 @@ package io.newgrounds.helpers {
 			if (checkSessionComponent == null) {
 				throw new Error("Could not create App.checkSession component");
 			}
+
+			var sentSessionId:String = core.appState.session.id;
+
 			core.executeComponent(checkSessionComponent as io.newgrounds.BaseComponent, function(response:io.newgrounds.models.objects.Response):void {
 				var result:io.newgrounds.models.results.App.checkSessionResult = null;
-				
+
+				// The session this check was about was cleared or replaced while it was in
+				// flight. Its answer describes a session the app no longer holds, so none of
+				// the lifecycle handling below may act on it: an EXPIRED_SESSION here would
+				// discard the NEW session. AppState has already declined to cache it.
+				if (core.appState.session.id !== sentSessionId) {
+					reportLocalSessionStatus(core, sessionStatus, callCallback);
+					return;
+				}
+
 				if (response !== null && response.success === true) {
 					result = response.getResult() as io.newgrounds.models.results.App.checkSessionResult;
 					
@@ -195,8 +210,30 @@ package io.newgrounds.helpers {
 			});
 			
 			core.appState.clearSession();
+
+			// Reset the throttle, so the next checkSession() starts a fresh session straight
+			// away instead of reporting on the one just cleared. Safe: a check still in
+			// flight for the old session can no longer overwrite the new one, and the next
+			// call re-arms the throttle as usual.
+			lastCheckSessionTime = null;
 		}
-		
+
+		/**
+		 * Reports the session status from local state, without contacting the server.
+		 * Used while the throttle is warm, while a session start is still out, and for a
+		 * check whose session went away while it was in flight.
+		 */
+		private static function reportLocalSessionStatus(core:Core, sessionStatus:SessionStatus, callCallback:Function):void {
+			if (core.appState.passportIsOpen === true) {
+				sessionStatus.status = SessionStatus.WAITING_FOR_PASSPORT;
+			} else if (core.appState.session.verified !== true) {
+				sessionStatus.status = SessionStatus.UNVERIFIED;
+			} else {
+				sessionStatus.status = SessionStatus.NOT_LOGGED_IN;
+			}
+			callCallback(sessionStatus);
+		}
+
 		/**
 		 * Requests a brand new guest session and reports the outcome through callCallback.
 		 *
@@ -212,7 +249,14 @@ package io.newgrounds.helpers {
 			if (startSessionComponent == null) {
 				throw new Error("Could not create App.startSession component");
 			}
+
+			sessionStartPending = true;
+
 			core.executeComponent(startSessionComponent as io.newgrounds.BaseComponent, function(response:io.newgrounds.models.objects.Response):void {
+
+				// First, on every path: a flag left set would make every later
+				// checkSession() answer locally forever.
+				sessionStartPending = false;
 
 				if (!response || response.success !== true) {
 					sessionStatus.status = SessionStatus.ERROR;

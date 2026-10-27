@@ -397,7 +397,35 @@ package io.newgrounds {
 		public function getSessionStatus():SessionStatus {
 			return AppStateSessionHelper.getSessionStatus(this, this.onSessionCleared);
 		}
-		
+
+		/**
+		 * True for an App.checkSession or App.startSession result whose request went out
+		 * for a session that is no longer the current one: the player signed out, or
+		 * another session replaced it, while the request was in flight. Writing it in
+		 * would put the old session back, so the response import skips
+		 * setValueFromResult() for it. The caller still receives the result.
+		 *
+		 * Compares against the id the request carried, not an id in the result, so it
+		 * never depends on what the server echoes back.
+		 *
+		 * @param resultObject A result model that extends BaseResult
+		 * @param sentSessionId The session id the request carried, or null for none
+		 */
+		public function isStaleSessionResult(resultObject:*, sentSessionId:String):Boolean {
+			if (resultObject == null) {
+				return false;
+			}
+			var name:String = resultObject.objectName;
+			if (name != "App.checkSession" && name != "App.startSession") {
+				return false;
+			}
+
+			var currentId:String = (session != null) ? session.id : null;
+			if (currentId == "") currentId = null;
+			if (sentSessionId == "") sentSessionId = null;
+			return currentId !== sentSessionId;
+		}
+
 		/**
 		 * Updates app state properties from server result values
 		 * 

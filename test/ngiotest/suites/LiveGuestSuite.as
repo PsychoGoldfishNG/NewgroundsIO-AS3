@@ -107,10 +107,9 @@ package ngiotest.suites {
                 // WITHOUT STARTING A NEW SESSION - so this would silently do
                 // nothing and every case below would fail for the wrong reason.
                 //
-                // Worth knowing outside the tests too: a game that calls
-                // endSession() and immediately checkSession() gets no new
-                // session and a misleading status. It has to wait out the
-                // throttle, exactly like this.
+                // (endSession() resets the throttle, so a game that signs out
+                // and checks straight away gets a new session at once. Parking
+                // a login locally, as above, doesn't, which is why this waits.)
                 self.afterThrottle(function():void {
                     NGIO.checkSession(function(status:SessionStatus):void {
                         if (!t.assertNotNull(status, "checkSession returned a status")) {
@@ -353,6 +352,30 @@ package ngiotest.suites {
                     t.note("clearSession() also wiped the stored session id; whether anything is " +
                            "remembered for next time depends on what the server says when the " +
                            "parked login is re-verified below");
+                    t.done();
+                });
+            });
+
+            add("starts a fresh session straight after ending one", function(t:TestContext):void {
+                // No afterThrottle() here, on purpose. endSession() resets the
+                // checkSession throttle, so the very next call has to start a
+                // new guest session instead of answering locally about the one
+                // that was just ended.
+                if (NGIO.hasSession()) {
+                    t.skip("the previous case didn't end the session");
+                    return;
+                }
+
+                NGIO.checkSession(function(status:SessionStatus):void {
+                    if (!t.assertNotNull(status, "checkSession returned a status")) {
+                        t.done();
+                        return;
+                    }
+
+                    t.assertEquals(SessionStatus.NOT_LOGGED_IN, status.status,
+                        "a new guest session was started without waiting out the throttle" +
+                        (status.error != null ? " (" + self.describeError(status.error) + ")" : ""));
+                    t.assertTrue(NGIO.hasSession(), "a session id is held");
                     t.done();
                 });
             });

@@ -109,7 +109,7 @@ waits for a run that happens to be in the right state — each creates it:
 | Suite | How it gets there | Cost |
 |---|---|---|
 | `LiveNoSessionSuite` | `setUp` **parks** the session `AppState` restored, `tearDown` puts it back | Nothing sent; no session ended |
-| `LiveGuestSuite` | Parks any login, then asks the gateway for a **real guest session**; ends it; restores the parked login | 3 extra gateway calls |
+| `LiveGuestSuite` | Parks any login, then asks the gateway for a **real guest session**; ends it; starts another straight away; restores the parked login | 4 extra gateway calls |
 
 Parking is purely local and entirely honest: the request envelope is built from
 `appState.session.id` ([Core.as:429](../build/io/newgrounds/Core.as#L429)), so
