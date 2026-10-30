@@ -319,6 +319,25 @@ package ngiotest.suites {
                 t.done();
             });
 
+            add("AppState.clearSession() leaves nothing of the previous player behind", function(t:TestContext):void {
+                var state:AppState = freshAppState();
+                var medal:Medal = ObjectFactory.CreateObject("Medal", { id: 1, unlocked: true }) as Medal;
+                state.medals = [medal];
+                state.session.id = "sess-1";
+                state.session.error = Errors.getError(Errors.EXPIRED_SESSION);
+                state.medalScore = 5;
+                state.passportIsOpen = true;
+
+                state.clearSession();
+
+                t.assertNull(state.session.id, "session id");
+                t.assertNull(state.session.error, "session error");
+                t.assertEquals(0, state.medalScore, "medal score");
+                t.assertFalse(state.passportIsOpen, "passportIsOpen, so the next player can open Passport");
+                t.assertFalse(medal.unlocked, "the last player's medal unlocks");
+                t.done();
+            });
+
             add("AppState reports an expired session as EXPIRED", function(t:TestContext):void {
                 var state:AppState = freshAppState();
                 state.session.id = "sess-1";
