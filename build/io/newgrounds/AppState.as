@@ -399,11 +399,16 @@ package io.newgrounds {
 		}
 
 		/**
-		 * True for an App.checkSession or App.startSession result whose request went out
-		 * for a session that is no longer the current one: the player signed out, or
-		 * another session replaced it, while the request was in flight. Writing it in
-		 * would put the old session back, so the response import skips
-		 * setValueFromResult() for it. The caller still receives the result.
+		 * True for a result whose request went out for a session that is no longer the
+		 * current one: the player signed out, or another session replaced it, while the
+		 * request was in flight. The response import skips setValueFromResult() for it.
+		 * The caller still receives the result.
+		 *
+		 * - App.checkSession / App.startSession: writing it in would put the old session
+		 *   back, so any change of session counts, including from none.
+		 * - Results that describe the signed-in player (medal unlocks, medal score, save
+		 *   slots): stale only when sent FOR a session that has since gone. One sent with
+		 *   no session describes nobody, so it is still good.
 		 *
 		 * Compares against the id the request carried, not an id in the result, so it
 		 * never depends on what the server echoes back.
@@ -415,15 +420,26 @@ package io.newgrounds {
 			if (resultObject == null) {
 				return false;
 			}
-			var name:String = resultObject.objectName;
-			if (name != "App.checkSession" && name != "App.startSession") {
-				return false;
-			}
 
 			var currentId:String = (session != null) ? session.id : null;
 			if (currentId == "") currentId = null;
 			if (sentSessionId == "") sentSessionId = null;
-			return currentId !== sentSessionId;
+
+			switch (resultObject.objectName) {
+				case "App.checkSession":
+				case "App.startSession":
+					return currentId !== sentSessionId;
+
+				case "Medal.getList":
+				case "Medal.getMedalScore":
+				case "Medal.unlock":
+				case "CloudSave.loadSlots":
+				case "CloudSave.loadSlot":
+				case "CloudSave.setData":
+				case "CloudSave.clearSlot":
+					return sentSessionId !== null && currentId !== sentSessionId;
+			}
+			return false;
 		}
 
 		/**

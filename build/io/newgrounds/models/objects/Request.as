@@ -19,7 +19,7 @@ package io.newgrounds.models.objects {
 		public var app_id:String = null;
 		
 		/**
-		 * An optional login session id. Components that save and unlock things to a user account will require this.
+		 * An optional login session id. Components that save and unlock things to a user account will require this. A session_id that is unknown, expired or malformed does not fail the request; components that need a session return error 104 in their own result.
 		 */
 		public var session_id:String = null;
 		
