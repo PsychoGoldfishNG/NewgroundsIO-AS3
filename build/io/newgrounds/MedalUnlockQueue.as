@@ -54,6 +54,13 @@ package io.newgrounds {
 		 */
 		public var keepGuestUnlocks:Boolean = true;
 
+		/**
+		 * Whether guest entries wait for the game to claim or discard them,
+		 * instead of going to whoever signs in next. No effect while
+		 * keepGuestUnlocks is false. Set through NGIO.holdGuestMedalUnlocks.
+		 */
+		public var holdGuestUnlocks:Boolean = false;
+
 		public function MedalUnlockQueue(core:Core) {
 			this.core = core;
 			// Scoped by App ID for the same reason the saved session id is: apps on
@@ -68,6 +75,79 @@ package io.newgrounds {
 				if (ids.indexOf(entry.id) == -1) ids.push(entry.id);
 			}
 			return ids;
+		}
+
+		/** Ids recorded while nobody was signed in, and not yet sent or discarded. */
+		public function getGuestIds():Array {
+			var ids:Array = [];
+			for each (var entry:Object in readEntries()) {
+				if (entry.user === null && ids.indexOf(entry.id) == -1) ids.push(entry.id);
+			}
+			return ids;
+		}
+
+		/**
+		 * Hands guest entries to the signed-in player and sends them. Each is
+		 * recorded as that player's before it goes out, so one that can't be sent
+		 * yet waits for them like any of their own. Ids with no guest entry are
+		 * ignored. With nobody signed in, the callback gets an empty list.
+		 *
+		 * @param ids Medal ids to claim
+		 * @param callback Called as callback(outcomes), the same shape unlock() reports
+		 * @param thisArg Context for the callback
+		 */
+		public function claimGuestUnlocks(ids:Array, callback:Function = null, thisArg:* = null):void {
+			var user:* = currentUserId();
+			var entries:Array = readEntries();
+			var claimed:Array = [];
+			for each (var id:* in ids) {
+				if (!(id is Number) || claimed.indexOf(id) != -1) continue;
+				for each (var entry:Object in entries) {
+					if (entry.id == id && entry.user === null) {
+						claimed.push(id);
+						break;
+					}
+				}
+			}
+
+			if (user === null || claimed.length == 0) {
+				if (callback != null) callback.call(thisArg, []);
+				return;
+			}
+
+			var kept:Array = entries.filter(function(e:Object, index:int, all:Array):Boolean {
+				return e.user !== null || claimed.indexOf(e.id) == -1;
+			});
+			for each (var claimedId:Number in claimed) {
+				var owned:Boolean = false;
+				for each (var k:Object in kept) {
+					if (k.id == claimedId && sameUser(k.user, user)) {
+						owned = true;
+						break;
+					}
+				}
+				if (!owned) kept.push({id: claimedId, user: user});
+			}
+			write(kept);
+
+			var toSend:Array = [];
+			for each (var sendId:Number in claimed) {
+				if (inFlight[sendId] !== true) toSend.push(sendId);
+			}
+			if (toSend.length == 0) {
+				if (callback != null) callback.call(thisArg, []);
+				return;
+			}
+			send(toSend, user, callback, thisArg);
+		}
+
+		/** Drops guest entries for these ids without sending them. Players' own entries are untouched. */
+		public function discardGuestUnlocks(ids:Array):void {
+			var entries:Array = readEntries();
+			var kept:Array = entries.filter(function(entry:Object, index:int, all:Array):Boolean {
+				return entry.user !== null || ids.indexOf(entry.id) == -1;
+			});
+			if (kept.length != entries.length) write(kept);
 		}
 
 		/**
@@ -102,7 +182,8 @@ package io.newgrounds {
 		/**
 		 * Re-sends what is still buffered for whoever is signed in now: their own
 		 * entries and any guest entries, minus anything already in flight. Another
-		 * player's entries wait until that player signs in again.
+		 * player's entries wait until that player signs in again. With
+		 * holdGuestUnlocks on, guest entries wait for claimGuestUnlocks() instead.
 		 *
 		 * Never throws. A failed pass is exactly the "still can't reach the
 		 * gateway" case this exists for, and one bad pass mustn't stop the next.
@@ -123,7 +204,7 @@ package io.newgrounds {
 				var user:* = currentUserId();
 				var pending:Array = [];
 				for each (var entry:Object in entries) {
-					if ((entry.user === null || sameUser(entry.user, user))
+					if ((entry.user === null ? !holdGuestUnlocks : sameUser(entry.user, user))
 						&& pending.indexOf(entry.id) == -1 && inFlight[entry.id] !== true) {
 						pending.push(entry.id);
 					}

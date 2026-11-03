@@ -172,6 +172,72 @@ package ngiotest.suites {
                 });
             });
 
+            add("holds guest unlocks on a retry pass when holdGuestUnlocks is on", function(t:TestContext):void {
+                resetStore();
+                memory["ngio-pending-medal-unlocks-for-" + APP_ID] = NGJSON.stringify([{id: 5, user: null}, {id: 6, user: 1}]);
+                var core:Core = signedInCore(1);
+                core.medalUnlockQueue.holdGuestUnlocks = true;
+                var sent:int = 0;
+                core.requestHandler = function(request:String, respond:Function):void {
+                    sent++;
+                    respond(200, unlockReply(true, 0));
+                };
+                core.medalUnlockQueue.retryPending();
+                t.assertEquals(1, sent, "only the player's own entry was sent");
+                t.assertEquals("5", core.medalUnlockQueue.getGuestIds().join(","), "the guest entry still waits");
+                t.done();
+            });
+
+            add("claims guest unlocks for the signed-in player", function(t:TestContext):void {
+                resetStore();
+                memory["ngio-pending-medal-unlocks-for-" + APP_ID] = NGJSON.stringify([{id: 5, user: null}, {id: 9, user: null}]);
+                var core:Core = signedInCore(1);
+                core.medalUnlockQueue.holdGuestUnlocks = true;
+                answerAll(core, unlockReply(true, 0));
+                core.medalUnlockQueue.claimGuestUnlocks([5, 77], function(outcomes:Array):void {
+                    t.assertEquals(1, outcomes.length, "77 had no guest entry");
+                    t.assertEquals(5, outcomes[0].id, "5 was claimed");
+                    t.assertEquals("9", core.medalUnlockQueue.getPendingIds().join(","), "only 9 is left");
+                    t.done();
+                });
+            });
+
+            add("keeps a claimed unlock as the player's own when it can't be sent yet", function(t:TestContext):void {
+                resetStore();
+                memory["ngio-pending-medal-unlocks-for-" + APP_ID] = NGJSON.stringify([{id: 5, user: null}]);
+                var core:Core = signedInCore(1);
+                core.medalUnlockQueue.holdGuestUnlocks = true;
+                core.requestHandler = function(request:String, respond:Function):void {
+                    respond(0, null);
+                };
+                core.medalUnlockQueue.claimGuestUnlocks([5], function(outcomes:Array):void {
+                    t.assertEquals(0, core.medalUnlockQueue.getGuestIds().length, "no longer a guest entry");
+                    t.assertEquals("5", core.medalUnlockQueue.getPendingIds().join(","), "still pending, as player 1's");
+                    t.done();
+                });
+            });
+
+            add("claims nothing with nobody signed in", function(t:TestContext):void {
+                resetStore();
+                memory["ngio-pending-medal-unlocks-for-" + APP_ID] = NGJSON.stringify([{id: 5, user: null}]);
+                var core:Core = new Core(APP_ID, TestConfig.ENCRYPTION_KEY);
+                core.medalUnlockQueue.claimGuestUnlocks([5], function(outcomes:Array):void {
+                    t.assertEquals(0, outcomes.length, "nothing claimed");
+                    t.assertEquals("5", core.medalUnlockQueue.getGuestIds().join(","), "still a guest entry");
+                    t.done();
+                });
+            });
+
+            add("discards guest unlocks and leaves players' own", function(t:TestContext):void {
+                resetStore();
+                memory["ngio-pending-medal-unlocks-for-" + APP_ID] = NGJSON.stringify([{id: 5, user: null}, {id: 5, user: 2}, {id: 6, user: null}]);
+                var core:Core = signedInCore(1);
+                core.medalUnlockQueue.discardGuestUnlocks([5]);
+                t.assertEquals("6", core.medalUnlockQueue.getGuestIds().join(","), "only 6 is left as a guest entry");
+                t.assertEquals("5,6", core.medalUnlockQueue.getPendingIds().join(","), "player 2's 5 is untouched");
+                t.done();
+            });
+
             add("Medal.unlock() marks the medal unlocked only when the gateway accepts it", function(t:TestContext):void {
                 resetStore();
                 var core:Core = signedInCore(1);
