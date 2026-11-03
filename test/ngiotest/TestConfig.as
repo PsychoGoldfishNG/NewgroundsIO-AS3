@@ -94,8 +94,12 @@ package ngiotest {
         /** Cloud save slots configured on the test app */
         public static const EXPECTED_SAVE_SLOT_COUNT:int = 10;
 
-        /** Save slot the CloudSave suite writes raw text to */
-        public static const TEST_SAVE_SLOT_ID:int = 1;
+        /**
+         * Save slot the CloudSave suite writes raw text to. The suite writes
+         * for real, with debug mode off, and empties the slot afterwards, so
+         * keep this on a slot that holds nothing you want.
+         */
+        public static const TEST_SAVE_SLOT_ID:int = 9;
 
         /**
          * A second scratch slot, used by the structured round-trip test.
@@ -108,7 +112,7 @@ package ngiotest {
          * fail against the *previous* test's payload. Separate slots mean
          * separate filenames, so the tests cannot alias each other.
          */
-        public static const TEST_SAVE_SLOT_ID_ALT:int = 2;
+        public static const TEST_SAVE_SLOT_ID_ALT:int = 10;
 
         //==================== FAILURE DIAGNOSTICS ====================
 

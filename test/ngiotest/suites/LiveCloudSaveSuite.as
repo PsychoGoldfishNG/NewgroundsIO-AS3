@@ -3,11 +3,13 @@
  *
  * Writes to a cloud save slot, reads it back over HTTP, and clears it.
  *
- * NOTE ON DEBUG MODE: unlike medals and scores, it is not certain that cloud
- * saves honour debug mode server-side. This suite therefore treats slot
- * TestConfig.TEST_SAVE_SLOT_ID as genuinely writable and restores it to empty
- * at the end. Point TEST_SAVE_SLOT_ID at a scratch slot, never one holding data
- * you care about.
+ * NOTE ON DEBUG MODE: the gateway never writes a cloud save in debug mode, so a
+ * round trip under TestConfig.USE_DEBUG_MODE would read back whatever the slot
+ * held before. This suite turns debug mode off for its own run, writes for real
+ * to TestConfig.TEST_SAVE_SLOT_ID and TEST_SAVE_SLOT_ID_ALT, and empties both in
+ * tearDown. Point those at scratch slots, never ones holding data you care
+ * about. One test switches debug mode back on to check that a debug write
+ * leaves the slot alone.
  *
  * The read-back is a plain HTTP GET against the returned url, so it is also the
  * only live test that exercises a non-gateway request.
@@ -25,8 +27,19 @@ package ngiotest.suites {
         /** Payload written by the save test and checked by the load test */
         private var writtenPayload:String;
 
+        /** The Core's debug mode before setUp turned it off, put back in tearDown */
+        private var savedDebugMode:Boolean;
+
         override public function get suiteName():String {
             return "Live / Cloud saves";
+        }
+
+        override public function setUp(done:Function):void {
+            super.setUp(function():void {
+                savedDebugMode = core.useDebugMode;
+                core.useDebugMode = false;
+                done.call(null);
+            });
         }
 
         override public function build():void {
@@ -104,6 +117,54 @@ package ngiotest.suites {
                         t.assertEquals(writtenPayload, data, "round-tripped exactly what was written");
                     }
                     t.done();
+                });
+            });
+
+            add("a debug-mode write leaves the slot alone", function(t:TestContext):void {
+                if (skipUnlessSignedIn(t)) {
+                    return;
+                }
+
+                var slot:SaveSlot = testSlot();
+                if (slot == null || !slot.hasData() || writtenPayload == null) {
+                    t.skip("the real write above did not land, so there is nothing to compare against");
+                    return;
+                }
+
+                var sizeBefore:int = slot.size;
+                var timestampBefore:Number = slot.timestamp;
+
+                core.useDebugMode = true;
+                slot.saveDataRaw("ngio-as3-debug-write:" + new Date().time, function(error:*):void {
+                    core.useDebugMode = false;
+
+                    if (!assertNoError(t, error, "debug-mode saveDataRaw accepted")) {
+                        t.done();
+                        return;
+                    }
+
+                    NGIO.loadSaveSlots(function(slots:Array, reloadError:*):void {
+                        if (!assertNoError(t, reloadError, "slot list reloaded")) {
+                            t.done();
+                            return;
+                        }
+
+                        var after:SaveSlot = testSlot();
+                        if (!t.assertNotNull(after, "test slot present in the list")) {
+                            t.done();
+                            return;
+                        }
+
+                        t.assertEquals(sizeBefore, after.size, "size unchanged");
+                        t.assertEquals(timestampBefore, after.timestamp, "save timestamp unchanged");
+
+                        after.loadDataRaw(function(data:String, loadError:*):void {
+                            if (assertNoError(t, loadError, "loadDataRaw completed")) {
+                                t.assertEquals(writtenPayload, data, "slot still holds the real write's data");
+                            }
+                            t.done();
+                        });
+                    });
                 });
             });
 
@@ -240,17 +301,26 @@ package ngiotest.suites {
 
         override public function tearDown(done:Function):void {
             // Leave both scratch slots empty regardless of how the suite ended,
-            // so a failed run does not leave test data on the account.
+            // so a failed run does not leave test data on the account. Debug
+            // mode stays off until then, or the clears would not happen either.
             if (!isSignedIn) {
-                done.call(null);
+                restoreDebugMode(done);
                 return;
             }
 
+            core.useDebugMode = false;
             clearIfUsed(testSlot(), function():void {
                 clearIfUsed(altSlot(), function():void {
-                    done.call(null);
+                    restoreDebugMode(done);
                 });
             });
+        }
+
+        private function restoreDebugMode(done:Function):void {
+            if (core != null) {
+                core.useDebugMode = savedDebugMode;
+            }
+            super.tearDown(done);
         }
 
         //==================== HELPERS ====================

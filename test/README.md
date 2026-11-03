@@ -41,6 +41,11 @@ You do **not** need to re-lock medals between runs. `TestConfig.USE_DEBUG_MODE`
 is on by default, so the gateway validates unlocks and score posts normally
 without committing them.
 
+The cloud save suite is the exception. The gateway never writes a cloud save in
+debug mode, so `LiveCloudSaveSuite` turns debug mode off for its own run, writes
+to slots `TEST_SAVE_SLOT_ID` and `TEST_SAVE_SLOT_ID_ALT` for real, and empties
+both when it finishes.
+
 ## Layout
 
 ```
@@ -182,7 +187,7 @@ Everything lives in `ngiotest/TestConfig.as`.
 | `REQUIRE_LOGIN` | `true` | `false` skips the Passport prompt and everything needing a user |
 | `CONFIRM_BEFORE_LIVE` | `true` | `false` goes straight online |
 | `APP_ID` / `ENCRYPTION_KEY` | AS3 test app | Unpublished app `61512:1uYiEl7d`, used only for this suite |
-| `TEST_SAVE_SLOT_ID` | `1` | Cloud save tests write here and clear it afterwards |
+| `TEST_SAVE_SLOT_ID` / `TEST_SAVE_SLOT_ID_ALT` | `9` / `10` | Cloud save tests write here for real, with debug mode off, and clear both afterwards. Keep them on empty slots |
 
 The expected counts (`EXPECTED_MEDAL_COUNT` and friends) are asserted against,
 so if the test app's configuration changes on Newgrounds, update them here.
