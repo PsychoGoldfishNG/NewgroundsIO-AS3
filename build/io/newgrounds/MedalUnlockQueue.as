@@ -1,0 +1,293 @@
+/**
+ * MedalUnlockQueue
+ *
+ * A durable buffer of medal ids whose unlock was requested but never confirmed,
+ * and the background pass that retries them.
+ *
+ * An unlock sent straight to the gateway is lost if the connection drops
+ * mid-request or the player closes the game before the answer arrives, and the
+ * player has already earned the medal. Ids are recorded before the request goes
+ * out, so a crash mid-request still leaves the id behind for the next attempt.
+ *
+ * Core creates one of these in its constructor. That's what scopes the buffer
+ * correctly: the pending set is per App ID and Core is the per-app instance.
+ * NGIO drives the retry pass on a timer, the same way it drives keepAlive().
+ *
+ * Each buffered unlock records the player who earned it (their user id, or null
+ * when nobody was signed in), so on a shared computer one player's unlock is
+ * never sent for another.
+ */
+package io.newgrounds {
+
+	import io.newgrounds.helpers.LocalStorageHelper;
+	import io.newgrounds.models.objects.Response;
+
+	public class MedalUnlockQueue {
+
+		/**
+		 * Error codes meaning the call was blocked on identity before this medal
+		 * was ever looked at. The gateway hasn't ruled on the medal, so the id
+		 * stays buffered. Medal.unlock needs a signed-in player, so a signed-out
+		 * unlock is refused locally with 102 or 110, the same as the server would.
+		 */
+		private static const SESSION_CLASS_ERROR_CODES:Array = [
+			Errors.MISSING_PARAMETER,   // 102
+			Errors.EXPIRED_SESSION,     // 104
+			Errors.LOGIN_REQUIRED,      // 110
+			Errors.CANCELLED_SESSION    // 111
+		];
+
+		private var core:Core;
+		private var storageKey:String;
+
+		/**
+		 * Ids out on a live request right now, as id -> true. Lets a retry pass
+		 * skip anything already in flight instead of sending it twice.
+		 */
+		private var inFlight:Object = {};
+
+		/**
+		 * Whether an unlock attempted while nobody is signed in is kept and sent
+		 * after a later sign-in. When false it is never recorded, and any guest
+		 * entry already buffered is dropped instead of sent. Set through
+		 * NGIO.keepGuestMedalUnlocks.
+		 */
+		public var keepGuestUnlocks:Boolean = true;
+
+		public function MedalUnlockQueue(core:Core) {
+			this.core = core;
+			// Scoped by App ID for the same reason the saved session id is: apps on
+			// the same host share their local storage.
+			this.storageKey = "ngio-pending-medal-unlocks-for-" + core.appId;
+		}
+
+		/** Ids currently waiting on the gateway, for any player. */
+		public function getPendingIds():Array {
+			var ids:Array = [];
+			for each (var entry:Object in readEntries()) {
+				if (ids.indexOf(entry.id) == -1) ids.push(entry.id);
+			}
+			return ids;
+		}
+
+		/**
+		 * Unlocks one or more medals, buffering each id before it is sent.
+		 *
+		 * @param ids Medal ids to unlock
+		 * @param callback Called once every id has an answer, as callback(outcomes),
+		 *        where each outcome is {id, medal, error}. error is null on success,
+		 *        and is the only reliable success signal.
+		 * @param thisArg Context for the callback
+		 */
+		public function unlock(ids:Array, callback:Function = null, thisArg:* = null):void {
+			var unique:Array = [];
+			for each (var id:* in ids) {
+				if (id is Number && unique.indexOf(id) == -1) unique.push(id);
+			}
+			if (unique.length == 0) {
+				if (callback != null) callback.call(thisArg, []);
+				return;
+			}
+
+			// Buffer BEFORE sending, not after the answer. This is what makes a
+			// crash or reload mid-request survivable.
+			var user:* = currentUserId();
+			if (user !== null || keepGuestUnlocks) {
+				addPending(unique, user);
+			}
+
+			send(unique, user, callback, thisArg);
+		}
+
+		/**
+		 * Re-sends what is still buffered for whoever is signed in now: their own
+		 * entries and any guest entries, minus anything already in flight. Another
+		 * player's entries wait until that player signs in again.
+		 *
+		 * Never throws. A failed pass is exactly the "still can't reach the
+		 * gateway" case this exists for, and one bad pass mustn't stop the next.
+		 */
+		public function retryPending():void {
+			try {
+				var entries:Array = readEntries();
+				if (!keepGuestUnlocks) {
+					var withoutGuests:Array = entries.filter(function(entry:Object, index:int, all:Array):Boolean {
+						return entry.user !== null;
+					});
+					if (withoutGuests.length != entries.length) {
+						entries = withoutGuests;
+						write(entries);
+					}
+				}
+
+				var user:* = currentUserId();
+				var pending:Array = [];
+				for each (var entry:Object in entries) {
+					if ((entry.user === null || sameUser(entry.user, user))
+						&& pending.indexOf(entry.id) == -1 && inFlight[entry.id] !== true) {
+						pending.push(entry.id);
+					}
+				}
+				if (pending.length == 0) return;
+				send(pending, user, null, null);
+			} catch (e:Error) {
+				// See above: a retry pass never passes a failure on.
+			}
+		}
+
+		//==================== PRIVATE ====================
+
+		/** Sends one Medal.unlock per id on behalf of `user`, settling the buffer as each comes back. */
+		private function send(ids:Array, user:*, callback:Function, thisArg:*):void {
+			var outcomes:Array = [];
+			var remaining:int = ids.length;
+			var finish:Function = function(outcome:Object):void {
+				outcomes.push(outcome);
+				remaining--;
+				if (remaining == 0 && callback != null) callback.call(thisArg, outcomes);
+			};
+
+			// One request per id rather than one batch: the gateway rules on each
+			// medal separately, and Core's component queue belongs to the game, so a
+			// retry pass must never drain it.
+			for each (var id:Number in ids) {
+				sendOne(id, user, finish);
+			}
+		}
+
+		/**
+		 * Sends one id. Its own function so each answer's closure captures its own
+		 * id: a closure made inside send()'s loop would share the loop variable.
+		 */
+		private function sendOne(id:Number, user:*, finish:Function):void {
+			var self:MedalUnlockQueue = this;
+			inFlight[id] = true;
+			core.callComponent("Medal.unlock", {id: id}, function(response:*, callbackParams:* = null):void {
+				delete self.inFlight[id];
+
+				var outcome:Object = self.adjudicate(id, response);
+				if (outcome.adjudicated) {
+					// The gateway ruled on this medal for this player. Retrying can't
+					// change that, so drop it whether the answer was yes or no.
+					self.removePending(id, user);
+				}
+				finish({id: outcome.id, medal: outcome.medal, error: outcome.error});
+			});
+		}
+
+		/** The signed-in player's user id, or null when nobody is signed in. */
+		private function currentUserId():* {
+			if (core.appState == null || core.appState.session == null || core.appState.session.user == null) return null;
+			return core.appState.session.user.id;
+		}
+
+		private static function sameUser(a:*, b:*):Boolean {
+			if (a === null || b === null) return a === null && b === null;
+			return a == b;
+		}
+
+		/**
+		 * Has the gateway ruled on this specific medal? That, not "did it
+		 * succeed", decides whether the id can be dropped.
+		 *
+		 * @return {id, medal, error, adjudicated}
+		 */
+		private function adjudicate(id:Number, response:*):Object {
+			// No response, or callComponent's local failure object: nothing reached
+			// the gateway, or nothing came back.
+			if (!(response is Response)) {
+				return {id: id, medal: null, error: asError(response != null ? response.error : null), adjudicated: false};
+			}
+
+			var res:Response = response as Response;
+			// The request as a whole was rejected before this medal was considered.
+			if (res.success !== true) {
+				return {id: id, medal: null, error: asError(res.error), adjudicated: false};
+			}
+
+			var result:* = res.getResult();
+			if (result == null) {
+				return {id: id, medal: null, error: Errors.getError(Errors.INVALID_RESPONSE), adjudicated: false};
+			}
+			if (result.success === true) {
+				return {id: id, medal: result.medal, error: null, adjudicated: true};
+			}
+
+			var error:* = (result.error != null) ? result.error : Errors.getError(Errors.INVALID_RESPONSE);
+			var code:int = (error.code != null) ? int(error.code) : Errors.UNKNOWN;
+			// Anything outside the session class means the gateway looked at this
+			// medal and rejected it, 202 (an unknown medal id) above all. That id is
+			// dropped and never retried.
+			return {id: id, medal: null, error: error, adjudicated: SESSION_CLASS_ERROR_CODES.indexOf(code) == -1};
+		}
+
+		private function asError(error:*):* {
+			if (error != null && !(error is String)) return error;
+			if (error is String) return Errors.getError(Errors.INVALID_RESPONSE, error as String, true);
+			return Errors.getError(Errors.INVALID_RESPONSE);
+		}
+
+		/**
+		 * The stored entries, as {id, user}. A bare number is an entry from before
+		 * unlocks recorded their player, and is read as a guest entry.
+		 */
+		private function readEntries():Array {
+			try {
+				var raw:String = LocalStorageHelper.getValue(storageKey);
+				if (raw == null || raw == "") return [];
+				var parsed:* = NGJSON.parse(raw);
+				if (!(parsed is Array)) return [];
+
+				var entries:Array = [];
+				for each (var item:* in parsed) {
+					if (item is Number) {
+						entries.push({id: item, user: null});
+					} else if (item != null && item.id is Number) {
+						entries.push({id: item.id, user: (item.user is Number) ? item.user : null});
+					}
+				}
+				return entries;
+			} catch (e:Error) {
+				// Unreadable stored data is treated as absent, not fatal.
+			}
+			return [];
+		}
+
+		private function addPending(ids:Array, user:*):void {
+			var entries:Array = readEntries();
+			for each (var id:Number in ids) {
+				var found:Boolean = false;
+				for each (var entry:Object in entries) {
+					if (entry.id == id && sameUser(entry.user, user)) {
+						found = true;
+						break;
+					}
+				}
+				if (!found) entries.push({id: id, user: user});
+			}
+			write(entries);
+		}
+
+		/**
+		 * Drops `id` for `user`, and any guest entry for it too: a guest unlock
+		 * sent after a sign-in is settled for that player.
+		 */
+		private function removePending(id:Number, user:*):void {
+			var entries:Array = readEntries();
+			var kept:Array = entries.filter(function(entry:Object, index:int, all:Array):Boolean {
+				return entry.id != id || (entry.user !== null && !sameUser(entry.user, user));
+			});
+			if (kept.length == entries.length) return;
+			write(kept);
+		}
+
+		private function write(entries:Array):void {
+			// Best effort, never fatal: a failed write just means the buffer isn't
+			// durable this time.
+			try {
+				LocalStorageHelper.setValue(storageKey, NGJSON.stringify(entries));
+			} catch (e:Error) {
+			}
+		}
+	}
+}

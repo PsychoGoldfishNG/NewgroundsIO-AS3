@@ -41,6 +41,7 @@ package initiator {
     import ngiotest.suites.OfflineCryptoSuite;
     import ngiotest.suites.OfflineForeignGuardSuite;
     import ngiotest.suites.OfflineJsonSuite;
+    import ngiotest.suites.OfflineLocalDataSuite;
     import ngiotest.suites.OfflineModelSuite;
     import ngiotest.suites.OfflineObjectFactorySuite;
     import ngiotest.suites.OfflineWireFormatSuite;
@@ -119,6 +120,7 @@ package initiator {
             runner.addSuite(new OfflineWireFormatSuite());
             runner.addSuite(new OfflineModelSuite());
             runner.addSuite(new OfflineForeignGuardSuite());
+            runner.addSuite(new OfflineLocalDataSuite());
 
             // --- live: real gateway ---
             runner.addSuite(new LiveGateSuite());

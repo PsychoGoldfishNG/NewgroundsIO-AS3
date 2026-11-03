@@ -93,13 +93,59 @@ package {
 		 * 300 seconds = 5 minutes
 		 */
 		public static const KEEP_ALIVE_TIME:Number = 300;
-		
+
+		/**
+		 * How often, in seconds, medal unlocks still waiting on the gateway are
+		 * sent again. A pass with nothing waiting sends nothing.
+		 */
+		public static const MEDAL_UNLOCK_RETRY_TIME:Number = 30;
+
 		//==================== PRIVATE STATIC PROPERTIES ====================
-		
+
 		/**
 		 * Timer that periodically pings the server to keep sessions alive
 		 */
 		private static var keepAliveTimer:Timer = null;
+
+		/**
+		 * Timer that resends medal unlocks the gateway never answered
+		 */
+		private static var medalUnlockRetryTimer:Timer = null;
+
+		private static var _keepGuestMedalUnlocks:Boolean = true;
+		private static var _offerGuestSaves:Boolean = true;
+
+		//==================== OPTIONS ====================
+
+		/**
+		 * Whether a medal unlock attempted while nobody is signed in is kept and
+		 * sent once a player signs in. Defaults to true. Set it to false if a
+		 * medal earned signed out must never be awarded later. Can be set before
+		 * or after init().
+		 */
+		public static function get keepGuestMedalUnlocks():Boolean {
+			return _keepGuestMedalUnlocks;
+		}
+
+		public static function set keepGuestMedalUnlocks(value:Boolean):void {
+			_keepGuestMedalUnlocks = value;
+			if (core != null) core.medalUnlockQueue.keepGuestUnlocks = value;
+		}
+
+		/**
+		 * Whether a save made while nobody is signed in becomes the local copy of
+		 * whoever signs in next. Defaults to true. Set it to false to keep guest
+		 * saves out of a signed-in player's slots. Can be set before or after
+		 * init().
+		 */
+		public static function get offerGuestSaves():Boolean {
+			return _offerGuestSaves;
+		}
+
+		public static function set offerGuestSaves(value:Boolean):void {
+			_offerGuestSaves = value;
+			if (core != null) core.appState.offerGuestSaves = value;
+		}
 		
 		//==================== PUBLIC STATIC METHODS ====================
 		
@@ -121,7 +167,24 @@ package {
 			}
 
 			core = NgioBootstrapHelper.doInitializationSequence(appId, encryptionKey, buildVersion, useDebugMode);
+			core.medalUnlockQueue.keepGuestUnlocks = _keepGuestMedalUnlocks;
+			core.appState.offerGuestSaves = _offerGuestSaves;
 			keepAliveTimer = NgioBootstrapHelper.startKeepAlive(KEEP_ALIVE_TIME, keepAlive);
+			medalUnlockRetryTimer = NgioBootstrapHelper.startKeepAlive(MEDAL_UNLOCK_RETRY_TIME, retryPendingMedalUnlocks);
+		}
+
+		/**
+		 * Sends medal unlocks that never got an answer again.
+		 *
+		 * init() already runs this on a timer, the same way it runs keepAlive().
+		 * It's public for the same reason keepAlive() is: a game can also call it
+		 * when it knows the connection is back. See MedalUnlockQueue.
+		 */
+		public static function retryPendingMedalUnlocks():void {
+			if (core == null) {
+				throw new Error("Core not initialized");
+			}
+			core.medalUnlockQueue.retryPending();
 		}
 		
 		/**

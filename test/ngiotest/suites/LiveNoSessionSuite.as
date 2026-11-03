@@ -44,6 +44,9 @@ package ngiotest.suites {
             return "Live / No session";
         }
 
+        /** NGIO.keepGuestMedalUnlocks before setUp turned it off */
+        private var savedKeepGuestUnlocks:Boolean = true;
+
         override public function setUp(done:Function):void {
             var self:LiveNoSessionSuite = this;
 
@@ -51,11 +54,18 @@ package ngiotest.suites {
             // exists to be parked after it has run.
             super.setUp(function():void {
                 self.stashSession();
+
+                // The unlock test below is about the refusal. With guest unlocks
+                // kept, the refused unlock would also be buffered and sent for
+                // the tester once they sign in, changing what the medal suites see.
+                self.savedKeepGuestUnlocks = NGIO.keepGuestMedalUnlocks;
+                NGIO.keepGuestMedalUnlocks = false;
                 done.call(null);
             });
         }
 
         override public function tearDown(done:Function):void {
+            NGIO.keepGuestMedalUnlocks = savedKeepGuestUnlocks;
             restoreSession();
             super.tearDown(done);
         }

@@ -60,6 +60,15 @@ package io.newgrounds.helpers {
 		 *        Core with the response so a late session result can be recognized.
 		 */
 		public static function sendHttpRequest(core:Core, requestString:String, callback:Function = null, thisArg:* = null, sentSessionId:* = undefined):void {
+			// A stand-in for the network (the offline tests). Its answer goes through
+			// exactly the same handling as a real one.
+			if (core.requestHandler != null) {
+				core.requestHandler.call(null, requestString, function(statusCode:int, responseText:String):void {
+					core.forwardHTTPResponse(statusCode, responseText, callback, thisArg, sentSessionId);
+				});
+				return;
+			}
+
 			Security.allowDomain("www.newgrounds.io", ".newgrounds.io", "*");
 			
 			var request:URLRequest = new URLRequest(Core.GATEWAY_URL);

@@ -44,8 +44,9 @@ package io.newgrounds.helpers {
         }
 
         /**
-        * Sets up an automatic timer that pings the server periodically
-        * This keeps active user sessions from expiring
+        * Sets up an automatic timer that calls onKeepAliveTick every
+        * keepAliveTimeSeconds. NGIO uses it for the keep-alive ping, which keeps
+        * active user sessions from expiring, and for resending medal unlocks.
         */
         public static function startKeepAlive(keepAliveTimeSeconds:Number, onKeepAliveTick:Function):Timer {
             // Create a timer that fires every KEEP_ALIVE_TIME seconds

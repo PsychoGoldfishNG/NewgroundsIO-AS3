@@ -86,6 +86,18 @@ package io.newgrounds {
          */
         public var networkObserver:Function = null;
 
+        /**
+         * Optional stand-in for the network, as
+         * function(requestString:String, respond:Function):void, where
+         * respond(statusCode:int, responseText:String) delivers the answer.
+         *
+         * When set, every gateway request goes here instead of out over HTTP, and
+         * whatever it passes to respond() is handled exactly like a real reply.
+         * It exists so the offline tests can check how the library handles a
+         * given answer. Leave it null in a game.
+         */
+        public var requestHandler:Function = null;
+
 		//==================== READONLY PROPERTIES ====================
 		
 		/**
@@ -110,7 +122,13 @@ package io.newgrounds {
 		 * Instead of contacting the server repeatedly, we cache the data locally for fast access
 		 */
 		public var appState:AppState;
-		
+
+		/**
+		 * Medal unlocks waiting on the gateway, and the retry pass that resends
+		 * them. Medal.unlock() goes through it. See MedalUnlockQueue.
+		 */
+		public var medalUnlockQueue:MedalUnlockQueue;
+
 		//==================== PRIVATE PROPERTIES ====================
 		
 		/**
@@ -170,7 +188,10 @@ package io.newgrounds {
 			
 			// Create a new AppState instance
 			this.appState = new AppState(this);
-			
+
+			// Scoped to this Core's App ID, like AppState
+			this.medalUnlockQueue = new MedalUnlockQueue(this);
+
 			// Load the crossdomain policy file to allow HTTPS connections
 			// This must be done before making any HTTPS requests
 			Security.loadPolicyFile(POLICY_FILE_URL);
