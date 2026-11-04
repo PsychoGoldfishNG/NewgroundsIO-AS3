@@ -483,11 +483,54 @@ package ngiotest.suites {
                     respond(0, null);
                 };
                 slotById(core, 1).saveDataRaw("offline-payload", function(error:*):void {
+                    var slot:SaveSlot = slotById(core, 1);
                     t.assertNull(error, "reported as saved");
-                    t.assertEquals("local", slotById(core, 1).source, "flagged as local");
+                    t.assertEquals("local", slot.source, "flagged as local");
                     t.assertEquals("offline-payload", memory[localKey(1) + ":slot:1"], "in the player's own copies");
+                    t.assertTrue(slot.hasData(), "describes the save just made, not the empty slot");
+                    t.assertEquals("offline-payload".length, slot.size, "the local copy's size");
+                    t.assertEquals(slot.getLocalCopy().datetime, slot.datetime, "the local copy's datetime");
+                    t.assertNull(slot.url, "no url");
                     t.done();
                 });
+            });
+
+            add("a clear that only reaches the local copy reads as empty straight away", function(t:TestContext):void {
+                resetStore();
+                seedLocal(1, "to-be-cleared", NEWER_TIME, 1);
+                var core:Core = signedInCore(1);
+                core.appState.applySlotListResult([cloudSlot(core, 1, null)]);
+                t.assertTrue(slotById(core, 1).hasData(), "starts with the local save");
+                core.requestHandler = function(request:String, respond:Function):void {
+                    respond(0, null);
+                };
+                slotById(core, 1).clearData(function(error:*):void {
+                    t.assertNull(error, "reported as cleared");
+                    t.assertFalse(slotById(core, 1).hasData(), "empty");
+                    t.assertNull(slotById(core, 1).datetime, "no datetime");
+                    t.done();
+                });
+            });
+
+            add("a local-only save leaves the slot alone if the player changed meanwhile", function(t:TestContext):void {
+                resetStore();
+                var core:Core = signedInCore(1);
+                core.appState.applySlotListResult([cloudSlot(core, 1, null)]);
+                var reply:Function = null;
+                core.requestHandler = function(request:String, respond:Function):void {
+                    reply = respond;
+                };
+                var slot:SaveSlot = slotById(core, 1);
+                slot.saveDataRaw("player-one", function(error:*):void {
+                    t.assertNull(error, "still reported as saved");
+                    t.assertFalse(slot.hasData(), "not described as the new player's");
+                    t.done();
+                });
+                var other:User = new User();
+                other.id = 2;
+                other.name = "Player 2";
+                core.appState.session.user = other;
+                if (t.assertNotNull(reply, "the request went out")) reply(0, null);
             });
 
             add("a save the cloud accepted is stamped with the cloud's datetime", function(t:TestContext):void {

@@ -16,6 +16,7 @@ package io.newgrounds.models.objects {
 	import flash.net.URLRequest;
 	import io.newgrounds.AppState;
 	import io.newgrounds.Errors;
+	import io.newgrounds.helpers.DateTimeHelper;
 	import io.newgrounds.helpers.HttpStatusHelper;
 	import io.newgrounds.models.objects.Response;
 	import io.newgrounds.models.objects.NgioError;
@@ -403,7 +404,7 @@ package io.newgrounds.models.objects {
          */
         private function writeThroughCloud(componentPath:String, componentParams:Object, localOk:Boolean, data:String, callback:Function, thisArg:*):void {
             if (this.core == null) {
-                if (localOk) this.source = "local";
+                if (localOk) describeLocalCopy();
                 if (callback != null) {
                     callback.call(thisArg, localOk ? null : Errors.getError(Errors.UNKNOWN, "This save slot has no core, and the local write failed."));
                 }
@@ -457,14 +458,44 @@ package io.newgrounds.models.objects {
             } else if (callbackParams.localOk) {
                 // Partial success: the write exists locally and nowhere else. Report
                 // it as a success, so the player is never told a save they still have
-                // was lost, and flag it so the game can show it isn't cloud-backed yet.
-                this.source = "local";
+                // was lost, and describe the local copy so the game shows the save
+                // just made, marked as not cloud-backed yet. Left alone if the player
+                // changed while the write was out: the current local copy isn't theirs.
+                var appState:AppState = localFallback();
+                if (appState != null && sameOwner(appState.getLocalSlotOwner(), callbackParams.owner)) {
+                    describeLocalCopy();
+                }
                 error = null;
             }
 
             if (callbackParams.callback != null) {
                 callbackParams.callback.call(callbackParams.thisArg, error);
             }
+        }
+
+        /**
+         * Points this model at the local copy, after a write that landed locally
+         * and nowhere else. Without it the model keeps describing the slot as it
+         * stood before the write: a first save made offline would still report no
+         * data, and a clear would still report the old save, until the next slot
+         * list merge. This sets what that merge would: the local copy's size and
+         * datetime, no url (there's nothing to fetch), and source "local". After a
+         * clear there's no local copy, so the slot reads as empty.
+         */
+        private function describeLocalCopy():void {
+            var entry:Object = getLocalCopy();
+            if (entry == null) {
+                this.size = 0;
+                this.datetime = null;
+                this.timestamp = 0;
+            } else {
+                var parsed:Number = DateTimeHelper.parseIso(entry.datetime);
+                this.size = entry.size;
+                this.datetime = entry.datetime;
+                this.timestamp = isNaN(parsed) ? 0 : Math.floor(parsed / 1000);
+            }
+            this.url = null;
+            this.source = "local";
         }
 
         /**
