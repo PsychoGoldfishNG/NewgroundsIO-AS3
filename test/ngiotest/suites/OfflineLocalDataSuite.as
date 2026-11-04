@@ -296,6 +296,52 @@ package ngiotest.suites {
                 });
             });
 
+            add("gives a fresh guest saveSlotCount empty slots to save into", function(t:TestContext):void {
+                resetStore();
+                var core:Core = new Core(APP_ID, TestConfig.ENCRYPTION_KEY);
+                core.requestHandler = function(request:String, respond:Function):void {};
+                core.appState.loadData(["saveSlots"], function(appState:*, error:*):void {
+                    t.assertEquals(3, core.appState.saveSlots.length, "three slots by default");
+                    for each (var slot:SaveSlot in core.appState.saveSlots) {
+                        t.assertEquals("local", slot.source, "slot " + slot.id + " describes the local copy");
+                        t.assertFalse(slot.hasData(), "slot " + slot.id + " is empty");
+                    }
+                    t.assertTrue(core.appState.hasLoaded("saveSlots"), "marked loaded");
+                    t.done();
+                });
+            });
+
+            add("lists as many empty slots as saveSlotCount says, around a guest copy", function(t:TestContext):void {
+                resetStore();
+                seedLocal(4, "guest-save", NEWER_TIME, null);
+                var core:Core = new Core(APP_ID, TestConfig.ENCRYPTION_KEY);
+                core.appState.saveSlotCount = 10;
+                core.requestHandler = function(request:String, respond:Function):void {};
+                core.appState.loadData(["saveSlots"], function(appState:*, error:*):void {
+                    t.assertEquals(10, core.appState.saveSlots.length, "ten slots");
+                    t.assertEquals(4, core.appState.saveSlots[3].id, "kept in id order");
+                    t.assertTrue(slotById(core, 4).hasData(), "the guest copy is still there");
+                    t.assertFalse(slotById(core, 5).hasData(), "the rest are empty");
+                    t.done();
+                });
+            });
+
+            add("fills the empty slots in place once the cloud list arrives", function(t:TestContext):void {
+                resetStore();
+                var core:Core = signedInCore(1);
+                core.requestHandler = function(request:String, respond:Function):void {
+                    respond(0, null);
+                };
+                core.appState.loadData(["saveSlots"], function(appState:*, error:*):void {
+                    var placeholder:SaveSlot = slotById(core, 2);
+                    core.appState.applySlotListResult([cloudSlot(core, 1, null), cloudSlot(core, 2, CLOUD_TIME), cloudSlot(core, 3, null)]);
+                    t.assertTrue(slotById(core, 2) === placeholder, "the same slot");
+                    t.assertEquals("cloud", placeholder.source, "now the cloud copy");
+                    t.assertTrue(placeholder.hasData(), "holds the cloud save");
+                    t.done();
+                });
+            });
+
             add("never shows one player's local copy to another", function(t:TestContext):void {
                 resetStore();
                 seedLocal(1, "player-two-save", NEWER_TIME, 2);

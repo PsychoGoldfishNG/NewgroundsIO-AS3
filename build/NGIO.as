@@ -115,6 +115,7 @@ package {
 		private static var _keepGuestMedalUnlocks:Boolean = true;
 		private static var _offerGuestSaves:Boolean = true;
 		private static var _holdGuestMedalUnlocks:Boolean = false;
+		private static var _saveSlotCount:int = 3;
 
 		//==================== OPTIONS ====================
 
@@ -162,7 +163,23 @@ package {
 			_offerGuestSaves = value;
 			if (core != null) core.appState.offerGuestSaves = value;
 		}
-		
+
+		/**
+		 * How many save slots this game has. Defaults to 3, which every game gets;
+		 * set it to 10 if the game uses the supporter expansion. When the slot list
+		 * can't be loaded (nobody signed in, or offline), this many slots are still
+		 * listed, so the player has somewhere to save. Can be set before or after
+		 * init().
+		 */
+		public static function get saveSlotCount():int {
+			return _saveSlotCount;
+		}
+
+		public static function set saveSlotCount(value:int):void {
+			_saveSlotCount = value;
+			if (core != null) core.appState.saveSlotCount = value;
+		}
+
 		//==================== PUBLIC STATIC METHODS ====================
 		
 		/**
@@ -186,6 +203,7 @@ package {
 			core.medalUnlockQueue.keepGuestUnlocks = _keepGuestMedalUnlocks;
 			core.medalUnlockQueue.holdGuestUnlocks = _holdGuestMedalUnlocks;
 			core.appState.offerGuestSaves = _offerGuestSaves;
+			core.appState.saveSlotCount = _saveSlotCount;
 			keepAliveTimer = NgioBootstrapHelper.startKeepAlive(KEEP_ALIVE_TIME, keepAlive);
 			medalUnlockRetryTimer = NgioBootstrapHelper.startKeepAlive(MEDAL_UNLOCK_RETRY_TIME, retryPendingMedalUnlocks);
 		}

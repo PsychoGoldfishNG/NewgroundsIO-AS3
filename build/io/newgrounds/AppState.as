@@ -88,6 +88,14 @@ package io.newgrounds {
 		 */
 		public var offerGuestSaves:Boolean = true;
 
+		/**
+		 * How many save slots this app has: 3 for every app, or 10 for one using
+		 * the supporter expansion. Used only when no slot list comes back from the
+		 * gateway (nobody signed in, or offline), so the player still has empty
+		 * slots to save into. Set through NGIO.saveSlotCount.
+		 */
+		public var saveSlotCount:int = 3;
+
 		//==================== READONLY PROPERTIES ====================
 		
 		/**
@@ -667,11 +675,45 @@ package io.newgrounds {
 		private function mergeWithoutCloudList():void {
 			if (this.saveSlots == null) {
 				applySlotList(null);
-				return;
+			} else {
+				applySlotList(this.saveSlots.filter(function(slot:*, index:int, all:Array):Boolean {
+					return slot.source != "local";
+				}));
 			}
-			applySlotList(this.saveSlots.filter(function(slot:*, index:int, all:Array):Boolean {
-				return slot.source != "local";
-			}));
+			addEmptySlots();
+		}
+
+		/**
+		 * Lists an empty slot for every id up to saveSlotCount that has none yet.
+		 * A guest, or a player who starts offline, otherwise has only the slots
+		 * this device already holds a copy of, and nowhere to make a first save.
+		 * Each one describes the (empty) local copy, since nothing is known about
+		 * the cloud's.
+		 */
+		private function addEmptySlots():void {
+			var added:Array = [];
+			for (var id:int = 1; id <= this.saveSlotCount; id++) {
+				if (findCachedSlot(id) != null) continue;
+				var slot:SaveSlot = ObjectFactory.CreateObject("SaveSlot", {
+					id: id,
+					size: 0,
+					datetime: null,
+					timestamp: 0,
+					url: null
+				}, this.core) as SaveSlot;
+				if (slot == null) continue;
+				slot.source = "local";
+				added.push(slot);
+			}
+			if (added.length == 0) return;
+
+			if (this.saveSlots == null) {
+				this.saveSlots = added;
+				markLoaded('saveSlots');
+			} else {
+				for each (var newSlot:SaveSlot in added) this.saveSlots.push(newSlot);
+				this.saveSlots.sortOn("id", Array.NUMERIC);
+			}
 		}
 
 		private function findCachedSlot(id:Number):SaveSlot {
