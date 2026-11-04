@@ -411,6 +411,20 @@ package io.newgrounds {
 		 * @param obj The plain object to encrypt (usually a JSON-compatible object)
 		 * @return The encrypted data encoded as Base64 string
 		 */
+		/**
+		 * Why encryption can't run with this Core's key, or null if it can. The
+		 * request serializer adds it to the error when encryptObject() fails.
+		 * AES-128 needs a 16-byte key; a project set to hex encoding hands out a
+		 * 32-character key, which decodes to 24 bytes as Base64.
+		 */
+		public function describeEncryptionProblem():String {
+			var length:int = (this.encryptionKeyBytes != null) ? this.encryptionKeyBytes.length : 0;
+			if (length != 16) {
+				return "The encryption key decodes to " + length + " bytes, and AES-128 needs 16. Use the Base64 AES-128 key from the project's API Tools.";
+			}
+			return null;
+		}
+
 		public function encryptObject(obj:Object):String {
 
             try {
@@ -450,6 +464,13 @@ package io.newgrounds {
 			// Use the cached Base64-decoded encryption key bytes
 			if (this.encryptionKeyBytes == null || this.encryptionKeyBytes.length == 0) {
 				trace("Encryption Error: Encryption key bytes not set");
+				return null;
+			}
+			// as3crypto would take a 24- or 32-byte key as AES-192/256, and the
+			// gateway couldn't read the result.
+			var problem:String = describeEncryptionProblem();
+			if (problem != null) {
+				trace("Encryption Error: " + problem);
 				return null;
 			}
 			var keyBytes:ByteArray = new ByteArray();
@@ -533,7 +554,20 @@ package io.newgrounds {
 			}
 			
 			// Convert Request/Execute container models to API transmission format
-			var plainObject:Object = HttpRequestHelper.buildGatewayRequestObject(requestModel);
+			var plainObject:Object;
+			try {
+				plainObject = HttpRequestHelper.buildGatewayRequestObject(requestModel);
+			} catch (serializeError:Error) {
+				// A secure component couldn't be encrypted. Nothing is sent, and the
+				// caller gets the same shape a dropped connection produces, so nothing
+				// reads this as the gateway ruling on a component: the medal queue
+				// keeps the unlock, and a save keeps its local copy.
+				var failed:io.newgrounds.models.objects.Response = ObjectFactory.CreateObject("Response", null, this) as io.newgrounds.models.objects.Response;
+				failed.error = Errors.getError(Errors.INVALID_ENCRYPTION, serializeError.message, true);
+				reportNetworkActivity("error", serializeError.message);
+				if (callback != null) callback.call(thisArg, failed);
+				return;
+			}
 			// Encode as JSON string for transmission
 			var requestString:String = NGJSON.stringify(plainObject);
 			

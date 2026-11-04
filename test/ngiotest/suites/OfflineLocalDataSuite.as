@@ -135,6 +135,29 @@ package ngiotest.suites {
                 });
             });
 
+            add("doesn't send an unlock it can't encrypt, and keeps it for a retry", function(t:TestContext):void {
+                resetStore();
+                // A key from a project set to hex encoding: 24 bytes as Base64.
+                var core:Core = new Core(APP_ID, "d458ddc1bac1199e2805ae8c3e15ea05");
+                core.appState.session.id = "session-1";
+                var user:User = new User();
+                user.id = 1;
+                core.appState.session.user = user;
+                var sent:int = 0;
+                core.requestHandler = function(request:String, respond:Function):void {
+                    sent++;
+                };
+                core.medalUnlockQueue.unlock([5], function(outcomes:Array):void {
+                    t.assertEquals(0, sent, "nothing sent");
+                    if (t.assertNotNull(outcomes[0].error, "an error")) {
+                        t.assertEquals(201, outcomes[0].error.code, "INVALID_ENCRYPTION");
+                        t.assertTrue(String(outcomes[0].error.message).indexOf("24 bytes") != -1, "names the key problem");
+                    }
+                    t.assertEquals("5", core.medalUnlockQueue.getPendingIds().join(","), "kept for a retry");
+                    t.done();
+                });
+            });
+
             add("never sends one player's unlock for another", function(t:TestContext):void {
                 resetStore();
                 memory["ngio-pending-medal-unlocks-for-" + APP_ID] = NGJSON.stringify([{id: 5, user: 2}]);
