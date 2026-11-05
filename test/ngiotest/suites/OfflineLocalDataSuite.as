@@ -14,6 +14,7 @@ package ngiotest.suites {
 
     import io.newgrounds.Core;
     import io.newgrounds.Errors;
+    import io.newgrounds.MedalUnlockStatus;
     import io.newgrounds.NGJSON;
     import io.newgrounds.helpers.DateTimeHelper;
     import io.newgrounds.helpers.LocalStorageHelper;
@@ -258,6 +259,97 @@ package ngiotest.suites {
                 core.medalUnlockQueue.discardGuestUnlocks([5]);
                 t.assertEquals("6", core.medalUnlockQueue.getGuestIds().join(","), "only 6 is left as a guest entry");
                 t.assertEquals("5,6", core.medalUnlockQueue.getPendingIds().join(","), "player 2's 5 is untouched");
+                t.done();
+            });
+
+            //==================== OUTCOME STATUS ====================
+
+            add("reports an accepted unlock as unlocked, and a refused medal as rejected", function(t:TestContext):void {
+                resetStore();
+                var core:Core = signedInCore(1);
+                answerAll(core, unlockReply(true, 0));
+                core.medalUnlockQueue.unlock([5], function(outcomes:Array):void {
+                    t.assertEquals(MedalUnlockStatus.UNLOCKED, outcomes[0].status, "unlocked");
+                    answerAll(core, unlockReply(false, Errors.INVALID_MEDAL_ID));
+                    core.medalUnlockQueue.unlock([6], function(refused:Array):void {
+                        t.assertEquals(MedalUnlockStatus.REJECTED, refused[0].status, "rejected");
+                        t.done();
+                    });
+                });
+            });
+
+            add("reports an unanswered unlock as pending", function(t:TestContext):void {
+                resetStore();
+                var core:Core = signedInCore(1);
+                core.requestHandler = function(request:String, respond:Function):void {
+                    respond(0, null);
+                };
+                core.medalUnlockQueue.unlock([5], function(outcomes:Array):void {
+                    t.assertEquals(MedalUnlockStatus.PENDING, outcomes[0].status, "pending");
+                    t.done();
+                });
+            });
+
+            add("reports a guest's unlock as pending, held or dropped, by setting", function(t:TestContext):void {
+                resetStore();
+                var core:Core = new Core(APP_ID, TestConfig.ENCRYPTION_KEY);
+                core.appState.session.id = "guest-session";
+                core.medalUnlockQueue.unlock([5], function(kept:Array):void {
+                    t.assertEquals(MedalUnlockStatus.PENDING, kept[0].status, "kept for the next sign-in");
+                    core.medalUnlockQueue.holdGuestUnlocks = true;
+                    core.medalUnlockQueue.unlock([6], function(held:Array):void {
+                        t.assertEquals(MedalUnlockStatus.HELD, held[0].status, "held for a claim");
+                        core.medalUnlockQueue.keepGuestUnlocks = false;
+                        core.medalUnlockQueue.unlock([7], function(dropped:Array):void {
+                            t.assertEquals(MedalUnlockStatus.DROPPED, dropped[0].status, "not kept");
+                            t.done();
+                        });
+                    });
+                });
+            });
+
+            //==================== HEARING ABOUT RETRIES ====================
+
+            add("hands a retry pass's outcomes to its callback, or an empty list", function(t:TestContext):void {
+                resetStore();
+                var core:Core = signedInCore(1);
+                answerAll(core, unlockReply(true, 0));
+                core.medalUnlockQueue.retryPending(function(empty:Array):void {
+                    t.assertEquals(0, empty.length, "nothing was waiting");
+                    memory["ngio-pending-medal-unlocks-for-" + APP_ID] = NGJSON.stringify([{id: 5, user: 1}]);
+                    core.medalUnlockQueue.retryPending(function(outcomes:Array):void {
+                        t.assertEquals(1, outcomes.length, "one sent");
+                        t.assertEquals(MedalUnlockStatus.UNLOCKED, outcomes[0].status, "and it unlocked");
+                        t.done();
+                    });
+                });
+            });
+
+            add("tells retry listeners about passes that sent something, until removed", function(t:TestContext):void {
+                resetStore();
+                var core:Core = signedInCore(1);
+                answerAll(core, unlockReply(true, 0));
+                var heard:Array = [];
+                var context:Object = {};
+                var listener:Function = function(outcomes:Array):void {
+                    t.assertTrue(this === context, "called with its thisArg");
+                    heard.push(outcomes);
+                };
+                core.medalUnlockQueue.addRetryListener(listener, context);
+                core.medalUnlockQueue.addRetryListener(listener, context);
+
+                core.medalUnlockQueue.retryPending();
+                t.assertEquals(0, heard.length, "not for a pass with nothing to send");
+
+                memory["ngio-pending-medal-unlocks-for-" + APP_ID] = NGJSON.stringify([{id: 5, user: 1}]);
+                core.medalUnlockQueue.retryPending();
+                t.assertEquals(1, heard.length, "once, though added twice");
+                t.assertEquals(MedalUnlockStatus.UNLOCKED, heard[0][0].status, "with the outcomes");
+
+                core.medalUnlockQueue.removeRetryListener(listener, context);
+                memory["ngio-pending-medal-unlocks-for-" + APP_ID] = NGJSON.stringify([{id: 6, user: 1}]);
+                core.medalUnlockQueue.retryPending();
+                t.assertEquals(1, heard.length, "not after it's removed");
                 t.done();
             });
 

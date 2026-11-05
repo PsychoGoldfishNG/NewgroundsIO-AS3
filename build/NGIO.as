@@ -214,12 +214,38 @@ package {
 		 * init() already runs this on a timer, the same way it runs keepAlive().
 		 * It's public for the same reason keepAlive() is: a game can also call it
 		 * when it knows the connection is back. See MedalUnlockQueue.
+		 *
+		 * @param callback Optional. Called as callback(outcomes) with this pass's
+		 *        outcomes, or an empty list when nothing was waiting. Each outcome's
+		 *        status (a MedalUnlockStatus value) says whether that medal unlocked.
+		 * @param thisArg Context for the callback
 		 */
-		public static function retryPendingMedalUnlocks():void {
+		public static function retryPendingMedalUnlocks(callback:Function = null, thisArg:* = null):void {
 			if (core == null) {
 				throw new Error("Core not initialized");
 			}
-			core.medalUnlockQueue.retryPending();
+			core.medalUnlockQueue.retryPending(callback, thisArg);
+		}
+
+		/**
+		 * Calls listener(outcomes) after every retry pass that sent anything,
+		 * including the ones init()'s timer runs. This is how a game hears that a
+		 * medal earned while the connection was down has now unlocked: look for
+		 * outcomes whose status is MedalUnlockStatus.UNLOCKED.
+		 */
+		public static function addMedalRetryListener(listener:Function, thisArg:* = null):void {
+			if (core == null) {
+				throw new Error("Core not initialized");
+			}
+			core.medalUnlockQueue.addRetryListener(listener, thisArg);
+		}
+
+		/** Removes a listener added with addMedalRetryListener(), matched by listener and thisArg. */
+		public static function removeMedalRetryListener(listener:Function, thisArg:* = null):void {
+			if (core == null) {
+				throw new Error("Core not initialized");
+			}
+			core.medalUnlockQueue.removeRetryListener(listener, thisArg);
 		}
 
 		/** The ids of medals unlocked while nobody was signed in, still waiting to be sent or discarded. */

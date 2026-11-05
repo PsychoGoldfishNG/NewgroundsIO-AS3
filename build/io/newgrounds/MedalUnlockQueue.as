@@ -46,6 +46,9 @@ package io.newgrounds {
 		 */
 		private var inFlight:Object = {};
 
+		/** Told about every retry pass that sent anything, as {listener, thisArg}. */
+		private var retryListeners:Array = [];
+
 		/**
 		 * Whether an unlock attempted while nobody is signed in is kept and sent
 		 * after a later sign-in. When false it is never recorded, and any guest
@@ -155,8 +158,8 @@ package io.newgrounds {
 		 *
 		 * @param ids Medal ids to unlock
 		 * @param callback Called once every id has an answer, as callback(outcomes),
-		 *        where each outcome is {id, medal, error}. error is null on success,
-		 *        and is the only reliable success signal.
+		 *        where each outcome is {id, medal, error, status}. status is a
+		 *        MedalUnlockStatus value, and error is null exactly when it's UNLOCKED.
 		 * @param thisArg Context for the callback
 		 */
 		public function unlock(ids:Array, callback:Function = null, thisArg:* = null):void {
@@ -187,8 +190,15 @@ package io.newgrounds {
 		 *
 		 * Never throws. A failed pass is exactly the "still can't reach the
 		 * gateway" case this exists for, and one bad pass mustn't stop the next.
+		 *
+		 * @param callback Called as callback(outcomes) once this pass is done, or
+		 *        with an empty list when nothing was waiting. Retry listeners hear
+		 *        about the pass too, but only when it sent something.
+		 * @param thisArg Context for the callback
 		 */
-		public function retryPending():void {
+		public function retryPending(callback:Function = null, thisArg:* = null):void {
+			var pending:Array = [];
+			var user:* = null;
 			try {
 				var entries:Array = readEntries();
 				if (!keepGuestUnlocks) {
@@ -201,19 +211,47 @@ package io.newgrounds {
 					}
 				}
 
-				var user:* = currentUserId();
-				var pending:Array = [];
+				user = currentUserId();
 				for each (var entry:Object in entries) {
 					if ((entry.user === null ? !holdGuestUnlocks : sameUser(entry.user, user))
 						&& pending.indexOf(entry.id) == -1 && inFlight[entry.id] !== true) {
 						pending.push(entry.id);
 					}
 				}
-				if (pending.length == 0) return;
-				send(pending, user, null, null);
 			} catch (e:Error) {
 				// See above: a retry pass never passes a failure on.
+				pending = [];
 			}
+
+			if (pending.length == 0) {
+				if (callback != null) callback.call(thisArg, []);
+				return;
+			}
+			var self:MedalUnlockQueue = this;
+			send(pending, user, function(outcomes:Array):void {
+				if (callback != null) callback.call(thisArg, outcomes);
+				// A copy, so a listener that removes itself doesn't skip the next one.
+				for each (var entry:Object in self.retryListeners.concat()) {
+					entry.listener.call(entry.thisArg, outcomes);
+				}
+			}, null);
+		}
+
+		/**
+		 * Adds a listener for retry passes: every pass that sent anything, whether
+		 * the timer or the game started it, calls listener(outcomes) once all the
+		 * answers are in. This is how a game hears that a medal earned offline has
+		 * now unlocked. Adding the same listener and thisArg twice does nothing more.
+		 */
+		public function addRetryListener(listener:Function, thisArg:* = null):void {
+			if (retryListenerIndex(listener, thisArg) != -1) return;
+			retryListeners.push({listener: listener, thisArg: thisArg});
+		}
+
+		/** Removes a listener added with the same listener and thisArg. */
+		public function removeRetryListener(listener:Function, thisArg:* = null):void {
+			var index:int = retryListenerIndex(listener, thisArg);
+			if (index != -1) retryListeners.splice(index, 1);
 		}
 
 		//==================== PRIVATE ====================
@@ -252,8 +290,35 @@ package io.newgrounds {
 					// change that, so drop it whether the answer was yes or no.
 					self.removePending(id, user);
 				}
-				finish({id: outcome.id, medal: outcome.medal, error: outcome.error});
+				finish({id: outcome.id, medal: outcome.medal, error: outcome.error, status: self.statusFor(outcome, user)});
 			});
+		}
+
+		/**
+		 * Where an answered attempt left the medal. Ruled on: unlocked or rejected.
+		 * Not ruled on: whatever the buffer still holds for it. An entry for the
+		 * player it was sent for, or a guest entry (a retry pass sends those for
+		 * whoever is signed in), means it will be tried again; a guest entry under
+		 * holdGuestUnlocks waits for a claim instead.
+		 */
+		private function statusFor(outcome:Object, user:*):String {
+			if (outcome.adjudicated) {
+				return outcome.error == null ? MedalUnlockStatus.UNLOCKED : MedalUnlockStatus.REJECTED;
+			}
+			for each (var entry:Object in readEntries()) {
+				if (entry.id == outcome.id && (entry.user === null || sameUser(entry.user, user))) {
+					if (entry.user === null && user === null && holdGuestUnlocks) return MedalUnlockStatus.HELD;
+					return MedalUnlockStatus.PENDING;
+				}
+			}
+			return MedalUnlockStatus.DROPPED;
+		}
+
+		private function retryListenerIndex(listener:Function, thisArg:*):int {
+			for (var i:int = 0; i < retryListeners.length; i++) {
+				if (retryListeners[i].listener === listener && retryListeners[i].thisArg === thisArg) return i;
+			}
+			return -1;
 		}
 
 		/** The signed-in player's user id, or null when nobody is signed in. */
